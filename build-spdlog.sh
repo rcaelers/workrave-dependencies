@@ -1,0 +1,18 @@
+#!/usr/bin/env bash -xe
+
+PACKAGE=spdlog
+VERSION=1.11.0
+
+BASEDIR=$(dirname "$0")
+source ${BASEDIR}/config.sh
+
+mkdir -p ${DEPLOYDIR} ${SOURCEDIR} ${BUILDDIR}
+
+cd ${SOURCEDIR}
+curl -OL https://github.com/gabime/spdlog/archive/refs/tags/v${VERSION}.tar.gz
+tar zxvf v${VERSION}.tar.gz
+
+cd ${BUILDDIR}
+CMAKE_PREFIX_PATH=${DEPLOYDIR} cmake ${SOURCEDIR}/spdlog-${VERSION} -G Ninja -DCMAKE_INSTALL_PREFIX=${DEPLOYDIR} -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DSPDLOG_INSTALL=ON -DSPDLOG_BUILD_SHARED=ON -DSPDLOG_FMT_EXTERNAL=ON -DSPDLOG_WCHAR_TO_UTF8_SUPPORT=ON -DCMAKE_CXX_STANDARD=20 -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
+cmake --build ${BUILDDIR}
+cmake --install ${BUILDDIR}

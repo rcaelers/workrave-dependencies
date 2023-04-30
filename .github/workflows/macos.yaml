@@ -1,0 +1,31 @@
+name: Workrave dependencies
+
+on:
+  push:
+    branches: main
+  workflow_dispatch:
+
+jobs:
+  dependencies:
+    runs-on: macos-latest
+    name: macOS dependencies
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build Boost
+        run: |
+          ./build-boost.sh
+
+      - name: Build Fmt
+        run: |
+          ./build-fmt.sh
+
+      - name: Build Spdlog
+        run: |
+          ./build-spdlog.sh
+
+      - name: Build Qt
+        run: |
+          ./build-qt.sh

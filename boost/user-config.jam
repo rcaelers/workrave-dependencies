@@ -1,0 +1,5 @@
+using darwin : : /usr/bin/clang++
+      : <compileflags>-mmacosx-version-min=11
+        <cxxflags>-std=c++20
+        <linkflags>-mmacosx-version-min=11
+      ;
