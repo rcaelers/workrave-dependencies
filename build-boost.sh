@@ -13,4 +13,4 @@ curl -OL https://boostorg.jfrog.io/artifactory/main/release/${VERSION}/source/bo
 cd ${SOURCEDIR}/boost_${VERSION_UNDERSCORES}
 patch -p0 < ${ROOTDIR}/boost/arm+x86.patch
 ./bootstrap.sh --prefix=${DEPLOYDIR}
-./b2 --prefix=${DEPLOYDIR} --user-config=${ROOTDIR}/boost/user-config.jam address-model=64 architecture=arm+x86 threading=multi link=shared abi=sysv binary-format=mach-o pch=off install
+./b2 --prefix=${DEPLOYDIR} --user-config=${ROOTDIR}/boost/user-config.jam -sNO_ZSTD=1 -sNO_LZMA=1 address-model=64 architecture=arm+x86 threading=multi link=shared abi=sysv binary-format=mach-o pch=off install
