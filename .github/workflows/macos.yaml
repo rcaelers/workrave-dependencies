@@ -6,9 +6,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  dependencies:
+  boost:
     runs-on: macos-latest
-    name: macOS dependencies
+    name: build Boost
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build Boost
+        run: |
+          ./build-boost.sh
+
+  fmt_and_spdlog:
+    runs-on: macos-latest
+    name: build Fmt/Spdlog
 
     steps:
       - name: Checkout
@@ -19,10 +31,6 @@ jobs:
           brew install ninja
           brew outdated cmake || brew upgrade cmake
 
-      - name: Build Boost
-        run: |
-          ./build-boost.sh
-
       - name: Build Fmt
         run: |
           ./build-fmt.sh
@@ -30,6 +38,19 @@ jobs:
       - name: Build Spdlog
         run: |
           ./build-spdlog.sh
+
+  qt:
+    runs-on: macos-latest
+    name: build Qt
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup build env
+        run: |
+          brew install ninja
+          brew outdated cmake || brew upgrade cmake
 
       - name: Build Qt
         run: |
