@@ -9,7 +9,7 @@ source ${BASEDIR}/config.sh
 export CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm/lib
 
 cd ${SOURCEDIR}
-$git clone git://code.qt.io/qt/qt5.git qt6
+git clone git://code.qt.io/qt/qt5.git qt6
 cd ${SOURCEDIR}/qt6
 git checkout ${VERSION}
 perl ./init-repository --module-subset=qtbase,qtimageformats,qtsvg,qttools,qttranslations
