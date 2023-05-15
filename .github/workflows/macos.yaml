@@ -2,13 +2,41 @@ name: Workrave dependencies
 
 on:
   push:
-    branches: main
+    branches: 
+      - main
   workflow_dispatch:
 
 jobs:
+  icu:
+    runs-on: macos-latest
+    name: build ICU
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build ICU
+        run: |
+          ./build-icu.sh
+
+  openssl:
+    runs-on: macos-latest
+    name: build OpenSSL
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build OpenSSL
+        run: |
+          ./build-openssl.sh
+
   boost:
     runs-on: macos-latest
     name: build Boost
+    needs: 
+      - icu
+      - openssl
 
     steps:
       - name: Checkout
