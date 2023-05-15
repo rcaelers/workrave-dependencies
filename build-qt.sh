@@ -27,6 +27,7 @@ ${SOURCEDIR}/qt6/configure \
     -nomake tests \
     -no-feature-relocatable \
     -rpath \
+    -c++std c++20 \
     --  \
     -G Ninja \
     -Wno-dev \
