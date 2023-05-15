@@ -28,6 +28,7 @@ ${SOURCEDIR}/qt6/configure \
     -no-feature-relocatable \
     -rpath \
     -c++std c++20 \
+    -no-icu \
     --  \
     -G Ninja \
     -Wno-dev \
