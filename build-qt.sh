@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=qt
-VERSION=v6.5.0
+VERSION=v6.5.1
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh
@@ -16,6 +16,10 @@ perl ./init-repository --module-subset=qtbase,qtimageformats,qtsvg,qttools,qttra
 
 rm -rf ${BUILDDIR}
 mkdir -p ${BUILDDIR}
+
+export PKG_CONFIG_PATH="${DEPLOYDIR}/lib/pkgconfig"
+export ICU_ROOT=${DEPLOYDIR} 
+export DYLD_LIBRARY_PATH="${DEPLOYDIR}/lib"
 
 cd ${BUILDDIR}
 ${SOURCEDIR}/qt6/configure \
@@ -32,6 +36,7 @@ ${SOURCEDIR}/qt6/configure \
     --  \
     -G Ninja \
     -Wno-dev \
+    -DICU_PREFIX=${DEPLOYDIR} \
     -DCMAKE_INSTALL_PREFIX=${DEPLOYDIR} \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_FIND_FRAMEWORK=FIRST \

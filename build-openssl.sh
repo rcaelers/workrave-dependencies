@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=openssl
-VERSION=3.1.0
+VERSION=3.1.1
 DYLD_VERSION=3
 
 BASEDIR=$(dirname "$0")
