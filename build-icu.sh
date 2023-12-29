@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=icu
-VERSION=73-2
+VERSION=74-1
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh

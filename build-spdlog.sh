@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=spdlog
-VERSION=da1e671d4285fce4b2b1603be90afc652c4f4b65
+VERSION=1.12.0
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh
