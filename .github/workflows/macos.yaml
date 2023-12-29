@@ -8,7 +8,7 @@ on:
 
 jobs:
   icu:
-    runs-on: macos-latest
+    runs-on: macos-13
     name: build ICU
 
     steps:
@@ -20,7 +20,7 @@ jobs:
           ./build-icu.sh
 
   openssl:
-    runs-on: macos-latest
+    runs-on: macos-13
     name: build OpenSSL
 
     steps:
@@ -32,7 +32,7 @@ jobs:
           ./build-openssl.sh
 
   boost:
-    runs-on: macos-latest
+    runs-on: macos-13
     name: build Boost
     needs: 
       - icu
@@ -47,7 +47,7 @@ jobs:
           ./build-boost.sh
 
   fmt_and_spdlog:
-    runs-on: macos-latest
+    runs-on: macos-13
     name: build Fmt/Spdlog
 
     steps:
@@ -68,7 +68,7 @@ jobs:
           ./build-spdlog.sh
 
   qt:
-    runs-on: macos-latest
+    runs-on: macos-13
     name: build Qt
 
     steps:
