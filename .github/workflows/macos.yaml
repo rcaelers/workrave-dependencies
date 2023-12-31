@@ -15,6 +15,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Update xcode 
+        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+      
       - name: Build ICU
         run: |
           ./build-icu.sh
@@ -27,6 +30,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Update xcode 
+        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+      
       - name: Build OpenSSL
         run: |
           ./build-openssl.sh
@@ -42,6 +48,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Update xcode 
+        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+      
       - name: Build Boost
         run: |
           ./build-boost.sh
@@ -54,6 +63,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Update xcode 
+        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+      
       - name: Setup build env
         run: |
           brew install ninja
@@ -75,6 +87,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Update xcode 
+        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+      
       - name: Setup build env
         run: |
           brew install ninja
