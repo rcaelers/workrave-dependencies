@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=boost
-VERSION=1.84.0
+VERSION=1.85.0
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh

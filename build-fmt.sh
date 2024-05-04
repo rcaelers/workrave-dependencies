@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=fmt
-VERSION=10.1.1
+VERSION=10.2.1
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh

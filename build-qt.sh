@@ -1,7 +1,7 @@
 #!/usr/bin/env bash -xe
 
 PACKAGE=qt
-VERSION=v6.6.1
+VERSION=v6.7.0
 
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh

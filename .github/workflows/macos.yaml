@@ -8,7 +8,7 @@ on:
 
 jobs:
   icu:
-    runs-on: macos-13
+    runs-on: macos-14
     name: build ICU
 
     steps:
@@ -16,14 +16,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+        run: sudo xcode-select --switch /Applications/Xcode_15.3.app
       
       - name: Build ICU
         run: |
           ./build-icu.sh
 
   openssl:
-    runs-on: macos-13
+    runs-on: macos-14
     name: build OpenSSL
 
     steps:
@@ -31,14 +31,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+        run: sudo xcode-select --switch /Applications/Xcode_15.3.app
       
       - name: Build OpenSSL
         run: |
           ./build-openssl.sh
 
   boost:
-    runs-on: macos-13
+    runs-on: macos-14
     name: build Boost
     needs: 
       - icu
@@ -49,14 +49,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+        run: sudo xcode-select --switch /Applications/Xcode_15.3.app
       
       - name: Build Boost
         run: |
           ./build-boost.sh
 
   fmt_and_spdlog:
-    runs-on: macos-13
+    runs-on: macos-14
     name: build Fmt/Spdlog
 
     steps:
@@ -64,7 +64,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+        run: sudo xcode-select --switch /Applications/Xcode_15.3.app
       
       - name: Setup build env
         run: |
@@ -80,7 +80,7 @@ jobs:
           ./build-spdlog.sh
 
   qt:
-    runs-on: macos-13
+    runs-on: macos-14
     name: build Qt
 
     steps:
@@ -88,7 +88,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.1.app
+        run: sudo xcode-select --switch /Applications/Xcode_15.3.app
       
       - name: Setup build env
         run: |
