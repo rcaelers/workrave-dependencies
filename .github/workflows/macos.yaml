@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update xcode 
         run: sudo xcode-select --switch /Applications/Xcode_15.4.app
@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update xcode 
         run: sudo xcode-select --switch /Applications/Xcode_15.4.app
@@ -41,10 +41,6 @@ jobs:
         run: |
           ./build-openssl.sh
 
-      - uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: '<PATH TO ARTIFACT>'
-          
   boost:
     runs-on: macos-14
     name: build Boost
@@ -54,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update xcode 
         run: sudo xcode-select --switch /Applications/Xcode_15.4.app
@@ -69,7 +65,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update xcode 
         run: sudo xcode-select --switch /Applications/Xcode_15.4.app
@@ -93,7 +89,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update xcode 
         run: sudo xcode-select --switch /Applications/Xcode_15.4.app
