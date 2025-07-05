@@ -1,0 +1,23 @@
+# Build artifacts
+_source/
+_build/
+_deploy/
+_packages/
+_ext/
+
+# Archives
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+*.zip
+
+# Package files
+*.pkg.tar.*
+*.db.tar.*
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*~
