@@ -3,16 +3,31 @@ name: Workrave dependencies
 permissions:
   id-token: write
   attestations: write
+  contents: write  # Needed for creating releases
+  actions: read    # Needed for downloading artifacts
+
+env:
+  XCODE_VERSION: "16.4"
+
+concurrency:
+  group: dependencies-build-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   push:
     branches: 
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
+  schedule:
+    # Weekly rebuild on Sundays at 2 AM UTC to get latest security updates
+    - cron: '0 2 * * 0'
 
 jobs:
   icu:
-    runs-on: macos-14
+    runs-on: macos-15
     name: build ICU
 
     steps:
@@ -20,14 +35,30 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Clean previous build
+        run: |
+          cd macos
+          rm -rf _source/icu _build/icu _deploy/dependencies
+          echo "Cleaned previous ICU build artifacts"
       
       - name: Build ICU
         run: |
+          cd macos
+          echo "::group::Building ICU"
           ./build-icu.sh
+          echo "::endgroup::"
+
+      - name: Upload ICU artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: icu-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
 
   openssl:
-    runs-on: macos-14
+    runs-on: macos-15
     name: build OpenSSL
 
     steps:
@@ -35,14 +66,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Clean previous build
+        run: |
+          cd macos
+          rm -rf _source/openssl _build/openssl _deploy/dependencies
+          echo "Cleaned previous OpenSSL build artifacts"
       
       - name: Build OpenSSL
         run: |
+          cd macos
           ./build-openssl.sh
 
+      - name: Upload OpenSSL artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
   boost:
-    runs-on: macos-14
+    runs-on: macos-15
     name: build Boost
     needs: 
       - icu
@@ -53,14 +98,40 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Clean previous build
+        run: |
+          cd macos
+          rm -rf _source/boost _build/boost _deploy/dependencies _ext/dependencies
+          echo "Cleaned previous Boost build artifacts"
+
+      - name: Download ICU artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: icu-dependencies-macos
+          path: macos/_ext/dependencies/
+
+      - name: Download OpenSSL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-dependencies-macos
+          path: macos/_ext/dependencies/
       
       - name: Build Boost
         run: |
+          cd macos
           ./build-boost.sh
+          
+      - name: Upload Boost artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: boost-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
 
   fmt_and_spdlog:
-    runs-on: macos-14
+    runs-on: macos-15
     name: build Fmt/Spdlog
 
     steps:
@@ -68,7 +139,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Clean previous build
+        run: |
+          cd macos
+          rm -rf _source/fmt _build/fmt _source/spdlog _build/spdlog _deploy/dependencies
+          echo "Cleaned previous Fmt/Spdlog build artifacts"
       
       - name: Setup build env
         run: |
@@ -77,14 +154,23 @@ jobs:
 
       - name: Build Fmt
         run: |
+          cd macos
           ./build-fmt.sh
 
       - name: Build Spdlog
         run: |
+          cd macos
           ./build-spdlog.sh
 
+      - name: Upload Fmt/Spdlog artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmt-spdlog-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
   qt:
-    runs-on: macos-14
+    runs-on: macos-15
     name: build Qt
 
     steps:
@@ -92,7 +178,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update xcode 
-        run: sudo xcode-select --switch /Applications/Xcode_15.4.app
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Clean previous build
+        run: |
+          cd macos
+          rm -rf _source/qt _build/qt _deploy/dependencies
+          echo "Cleaned previous Qt build artifacts"
       
       - name: Setup build env
         run: |
@@ -102,3 +194,196 @@ jobs:
       - name: Build Qt
         run: |
           ./build-qt.sh
+
+      - name: Upload Qt artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
+  create_release:
+    runs-on: macos-15
+    name: Create GitHub Release
+    needs: 
+      - icu
+      - openssl
+      - boost
+      - fmt_and_spdlog
+      - qt
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub CLI
+        run: |
+          brew install gh
+
+      - name: Download ICU artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: icu-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download OpenSSL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download Boost artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: boost-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download Fmt/Spdlog artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: fmt-spdlog-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download Qt artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qt-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Create archive
+        run: |
+          cd combined-dependencies
+          echo "::group::Creating release archive"
+          tar -czf ../workrave-dependencies-macos.tar.gz .
+          echo "::endgroup::"
+          cd ..
+          echo "Archive created successfully:"
+          ls -la workrave-dependencies-macos.tar.gz
+          echo "Archive contents:"
+          tar -tzf workrave-dependencies-macos.tar.gz | head -20
+
+      - name: Generate release tag and name
+        id: release_info
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            # For tags, use the tag name
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "name=Workrave Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          else
+            # For pushes, always use 'latest' tag
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "name=Workrave Dependencies (Latest)" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Delete existing latest release
+        if: github.ref_type != 'tag'
+        run: |
+          # Delete the latest release and tag if it exists (for push events only)
+          gh release delete latest --yes || true
+          git push --delete origin latest || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          release_name: ${{ steps.release_info.outputs.name }}
+          body: |
+            Workrave macOS dependencies built on $(date +'%Y-%m-%d %H:%M:%S UTC')
+            
+            This release contains all the dependencies needed for Workrave on macOS:
+            - ICU
+            - OpenSSL
+            - Boost
+            - Fmt
+            - Spdlog
+            - Qt
+            
+            Built with Xcode 16.4 on macOS 15.
+            
+            Commit: ${{ github.sha }}
+            ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ steps.release_info.outputs.is_prerelease }}
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./workrave-dependencies-macos.tar.gz
+          asset_name: workrave-dependencies-macos.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ./workrave-dependencies-macos.tar.gz
+
+      - name: Generate build summary
+        run: |
+          echo "## 🎉 Workrave Dependencies Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Release Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.release_info.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release**: ${{ steps.release_info.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Date**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Dependencies Built" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ICU" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ OpenSSL" >> $GITHUB_STEP_SUMMARY  
+          echo "- ✅ Boost" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Fmt" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Spdlog" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Qt" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Archive Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **File**: workrave-dependencies-macos.tar.gz" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: $(ls -lh workrave-dependencies-macos.tar.gz | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA256**: $(shasum -a 256 workrave-dependencies-macos.tar.gz | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
+
+  cleanup_individual_artifacts:
+    runs-on: macos-15
+    name: Cleanup individual artifacts
+    needs: 
+      - create_release
+    if: always()
+
+    steps:
+      - name: Delete ICU artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: icu-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete OpenSSL artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: openssl-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete Boost artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: boost-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete Fmt/Spdlog artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: fmt-spdlog-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete Qt artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: qt-dependencies-macos
+        continue-on-error: true
