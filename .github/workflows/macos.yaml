@@ -193,6 +193,7 @@ jobs:
 
       - name: Build Qt
         run: |
+          cd macos
           ./build-qt.sh
 
       - name: Upload Qt artifacts
