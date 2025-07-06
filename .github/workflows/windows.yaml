@@ -52,6 +52,8 @@ jobs:
             mingw-w64-clang-x86_64-pkg-config
             mingw-w64-clang-x86_64-openssl
             mingw-w64-clang-x86_64-libxml2
+            mingw-w64-clang-x86_64-libxslt
+            mingw-w64-clang-x86_64-gnutls
 
       - name: Create pacman packages
         run: |
