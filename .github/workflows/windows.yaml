@@ -1,0 +1,173 @@
+name: Workrave Windows dependencies
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: write
+  actions: read
+
+concurrency:
+  group: windows-dependencies-build-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yaml"
+  workflow_dispatch:
+
+jobs:
+  create_packages:
+    runs-on: windows-latest
+    name: Create pacman packages
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            git
+            base-devel
+            pacman-contrib
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-autotools
+            mingw-w64-clang-x86_64-pkg-config
+            mingw-w64-clang-x86_64-openssl
+            mingw-w64-clang-x86_64-libxml2
+
+      - name: Create pacman packages
+        run: |
+          echo "::group::Creating pacman packages"
+
+          mkdir -p windows/_deploy
+          cd windows/mingw-w64-clang-x86_64-xmlsec
+          makepkg --noconfirm --force
+
+          find . -name "*.pkg.tar.*" -exec cp {} ../_deploy/ \;
+
+          echo "::endgroup::"
+
+      - name: Create release archive
+        run: |
+          cd windows/_deploy
+          echo "::group::Creating release archive"
+          tar -czf ../../workrave-mingw-packages.tar.gz *.pkg.tar.*
+          echo "::endgroup::"
+          cd ../..
+          echo "Archive created successfully:"
+          ls -la workrave-mingw-packages.tar.gz
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: workrave-mingw-packages
+          path: workrave-mingw-packages.tar.gz
+          retention-days: 7
+
+  create_release:
+    runs-on: windows-latest
+    name: Create GitHub Release
+    needs:
+      - create_packages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: workrave-mingw-packages
+          path: .
+
+      - name: Generate release tag and name
+        id: release_info
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            # For tags, use the tag name
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "name=Workrave Windows Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          else
+            # For pushes, always use 'windows-latest' tag
+            echo "tag=windows-latest" >> $GITHUB_OUTPUT
+            echo "name=Workrave Windows Dependencies (Latest)" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Generate build date
+          echo "build_date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
+      - name: Delete existing latest release
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: |
+          # Delete the windows-latest release and tag if it exists (for push events only)
+          gh release delete windows-latest --yes || true
+          git push --delete origin windows-latest || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          release_name: ${{ steps.release_info.outputs.name }}
+          body: |
+            Workrave Windows dependencies built on ${{ steps.release_info.outputs.build_date }}
+
+            Commit: ${{ github.sha }}
+            ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ steps.release_info.outputs.is_prerelease }}
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./workrave-mingw-packages.tar.gz
+          asset_name: workrave-mingw-packages.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ./workrave-mingw-packages.tar.gz
+
+  cleanup_artifacts:
+    runs-on: windows-latest
+    name: Cleanup artifacts
+    needs:
+      - create_release
+    if: always()
+
+    steps:
+      - name: Delete package artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: workrave-mingw-packages
+        continue-on-error: true

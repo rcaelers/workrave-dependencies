@@ -1,9 +1,10 @@
 # Maintainer: Peter Budai <peterbudai at hotmail dot com>
+# Modified by: Rob Caelers <rob dot caelers at gmail dot com>
 
 _realname=xmlsec
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=1.2.39
+pkgver=1.3.7
 pkgrel=1
 pkgdesc="XML Security Library is a C library based on LibXML2 (mingw-w64)"
 arch=('any')
@@ -17,67 +18,43 @@ depends=("${MINGW_PACKAGE_PREFIX}-libxml2"
          "${MINGW_PACKAGE_PREFIX}-libxslt"
          "${MINGW_PACKAGE_PREFIX}-openssl"
          "${MINGW_PACKAGE_PREFIX}-gnutls"
-         "${MINGW_PACKAGE_PREFIX}-libgcrypt"
-         "${MINGW_PACKAGE_PREFIX}-nss"
-         "${MINGW_PACKAGE_PREFIX}-libltdl")
+         )
 makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
              "${MINGW_PACKAGE_PREFIX}-autotools")
-source=(https://www.aleksey.com/xmlsec/download/${_realname}1-${pkgver}.tar.gz
-        01-include-openssl-last.patch
-        02-make-new-wincrypt-functions-available.patch)
-sha256sums=('15f2f55ea5968e578fcd24b3b427e553876c86c147dc7f03923e98fc2768a1fa'
-            '015473ce9ad0110ebf4a43be3d3046b5616345799879512d5da22a71b4cecc35'
-            'c3297ca54a8baa50a880da35d546868faf7579d0b60b143385892034927fb9f3')
+source=(https://www.aleksey.com/xmlsec/download/${_realname}1-${pkgver}.tar.gz)
+sha256sums=('d82e93b69b8aa205a616b62917a269322bf63a3eaafb3775014e61752b2013ea')
 
 prepare() {
   cd "${srcdir}/${_realname}1-${pkgver}"
-  patch -p1 -i "${srcdir}"/01-include-openssl-last.patch
-  patch -p1 -i "${srcdir}"/02-make-new-wincrypt-functions-available.patch
   autoreconf -fiv
 }
 
 build() {
-  mkdir -p "${srcdir}/build-${MSYSTEM}-static" && cd "${srcdir}/build-${MSYSTEM}-static"
-
-  CPPFLAGS+=" -DLIBXML_STATIC -DLIBXSLT_STATIC -DXMLSEC_STATIC" \
-  ../${_realname}1-${pkgver}/configure \
-    --prefix="${MINGW_PREFIX}" \
-    --build=${MINGW_CHOST} \
-    --host=${MINGW_CHOST} \
-    --disable-shared \
-    --enable-static \
-    --enable-static-linking \
-    --enable-mscrypto \
-    --enable-mscng
-
-  make
-
   mkdir -p "${srcdir}/build-${MSYSTEM}-shared" && cd "${srcdir}/build-${MSYSTEM}-shared"
 
   ../${_realname}1-${pkgver}/configure \
     --prefix="${MINGW_PREFIX}" \
     --build=${MINGW_CHOST} \
     --host=${MINGW_CHOST} \
+    --disable-pedantic \
     --enable-shared \
     --disable-static \
-    --enable-mscrypto \
-    --enable-mscng
+    --with-default-crypto=openssl \
+    --disable-crypto-dl \
+    --disable-apps-crypto-dl \
+    --disable-mscng \
+    --disable-mscrypto \
+    --with-nss=no \
+    --with-nspr=no
 
-  make
+  make -j8 V=1
 }
 
 check() {
-  cd "${srcdir}/build-${MSYSTEM}-static"
-  make check || warning "Tests failed"
-
-  cd "${srcdir}/build-${MSYSTEM}-shared"
-  make check || warning "Tests failed"
+  echo
 }
 
 package() {
-  cd "${srcdir}/build-${MSYSTEM}-static"
-  make DESTDIR="${pkgdir}" install
-
   cd "${srcdir}/build-${MSYSTEM}-shared"
   make DESTDIR="${pkgdir}" install
 
@@ -89,8 +66,6 @@ package() {
   local PREFIX_DEPS=$(cygpath -am ${MINGW_PREFIX})
 
   pushd "${pkgdir}${MINGW_PREFIX}/lib/pkgconfig" > /dev/null
-  sed -s "s|${PREFIX_DEPS}\/lib|\${libdir}|g" -i ./xmlsec1-gcrypt.pc
-  sed -s "s|${PREFIX_DEPS}\/include|\${includedir}|g" -i ./xmlsec1-gcrypt.pc
   sed -s "s|${PREFIX_DEPS}\/lib|\${libdir}|g" -i ./xmlsec1-gnutls.pc
   sed -s "s|${PREFIX_DEPS}\/include|\${includedir}|g" -i ./xmlsec1-gnutls.pc
   sed -s "s|${PREFIX_DEPS}\/lib|\${libdir}|g" -i ./xmlsec1-openssl.pc

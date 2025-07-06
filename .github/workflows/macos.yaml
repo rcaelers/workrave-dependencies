@@ -3,8 +3,8 @@ name: Workrave dependencies
 permissions:
   id-token: write
   attestations: write
-  contents: write  # Needed for creating releases
-  actions: read    # Needed for downloading artifacts
+  contents: write # Needed for creating releases
+  actions: read # Needed for downloading artifacts
 
 env:
   XCODE_VERSION: "16.4"
@@ -15,15 +15,21 @@ concurrency:
 
 on:
   push:
-    branches: 
+    branches:
       - main
+    paths:
+      - "macos/**"
+      - ".github/workflows/macos.yaml"
   pull_request:
     branches:
       - main
+    paths:
+      - "macos/**"
+      - ".github/workflows/macos.yaml"
   workflow_dispatch:
   schedule:
     # Weekly rebuild on Sundays at 2 AM UTC to get latest security updates
-    - cron: '0 2 * * 0'
+    - cron: "0 2 * * 0"
 
 jobs:
   icu:
@@ -34,16 +40,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update xcode 
+      - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Cache ICU build
+        id: cache-icu
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: icu-${{ runner.os }}-${{ hashFiles('macos/build-icu.sh') }}
+          restore-keys: |
+            icu-${{ runner.os }}-
+
       - name: Clean previous build
+        if: steps.cache-icu.outputs.cache-hit != 'true'
         run: |
           cd macos
           rm -rf _source/icu _build/icu _deploy/dependencies
           echo "Cleaned previous ICU build artifacts"
-      
+
       - name: Build ICU
+        if: steps.cache-icu.outputs.cache-hit != 'true'
         run: |
           cd macos
           echo "::group::Building ICU"
@@ -65,7 +82,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update xcode 
+      - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
       - name: Clean previous build
@@ -73,7 +90,7 @@ jobs:
           cd macos
           rm -rf _source/openssl _build/openssl _deploy/dependencies
           echo "Cleaned previous OpenSSL build artifacts"
-      
+
       - name: Build OpenSSL
         run: |
           cd macos
@@ -89,7 +106,7 @@ jobs:
   boost:
     runs-on: macos-15
     name: build Boost
-    needs: 
+    needs:
       - icu
       - openssl
 
@@ -97,7 +114,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update xcode 
+      - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
       - name: Clean previous build
@@ -117,12 +134,12 @@ jobs:
         with:
           name: openssl-dependencies-macos
           path: macos/_ext/dependencies/
-      
+
       - name: Build Boost
         run: |
           cd macos
           ./build-boost.sh
-          
+
       - name: Upload Boost artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -138,7 +155,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update xcode 
+      - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
       - name: Clean previous build
@@ -146,7 +163,7 @@ jobs:
           cd macos
           rm -rf _source/fmt _build/fmt _source/spdlog _build/spdlog _deploy/dependencies
           echo "Cleaned previous Fmt/Spdlog build artifacts"
-      
+
       - name: Setup build env
         run: |
           brew install ninja
@@ -177,21 +194,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update xcode 
+      - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Cache Qt build
+        id: cache-qt
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: qt-${{ runner.os }}-${{ hashFiles('macos/build-qt.sh') }}
+          restore-keys: |
+            qt-${{ runner.os }}-
+
       - name: Clean previous build
+        if: steps.cache-qt.outputs.cache-hit != 'true'
         run: |
           cd macos
           rm -rf _source/qt _build/qt _deploy/dependencies
           echo "Cleaned previous Qt build artifacts"
-      
+
       - name: Setup build env
+        if: steps.cache-qt.outputs.cache-hit != 'true'
         run: |
           brew install ninja
           brew outdated cmake || brew upgrade cmake
 
       - name: Build Qt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
         run: |
           cd macos
           ./build-qt.sh
@@ -206,7 +235,7 @@ jobs:
   create_release:
     runs-on: macos-15
     name: Create GitHub Release
-    needs: 
+    needs:
       - icu
       - openssl
       - boost
@@ -278,6 +307,9 @@ jobs:
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           fi
 
+          # Generate build date
+          echo "build_date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
+
       - name: Delete existing latest release
         if: github.ref_type != 'tag'
         run: |
@@ -296,8 +328,8 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           release_name: ${{ steps.release_info.outputs.name }}
           body: |
-            Workrave macOS dependencies built on $(date +'%Y-%m-%d %H:%M:%S UTC')
-            
+            Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
+
             This release contains all the dependencies needed for Workrave on macOS:
             - ICU
             - OpenSSL
@@ -305,9 +337,9 @@ jobs:
             - Fmt
             - Spdlog
             - Qt
-            
+
             Built with Xcode 16.4 on macOS 15.
-            
+
             Commit: ${{ github.sha }}
             ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
           draft: false
@@ -328,33 +360,10 @@ jobs:
         with:
           subject-path: ./workrave-dependencies-macos.tar.gz
 
-      - name: Generate build summary
-        run: |
-          echo "## 🎉 Workrave Dependencies Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Release Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: ${{ steps.release_info.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Release**: ${{ steps.release_info.outputs.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Date**: $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Dependencies Built" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ ICU" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ OpenSSL" >> $GITHUB_STEP_SUMMARY  
-          echo "- ✅ Boost" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Fmt" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Spdlog" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Qt" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 Archive Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **File**: workrave-dependencies-macos.tar.gz" >> $GITHUB_STEP_SUMMARY
-          echo "- **Size**: $(ls -lh workrave-dependencies-macos.tar.gz | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
-          echo "- **SHA256**: $(shasum -a 256 workrave-dependencies-macos.tar.gz | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
-
   cleanup_individual_artifacts:
     runs-on: macos-15
     name: Cleanup individual artifacts
-    needs: 
+    needs:
       - create_release
     if: always()
 
