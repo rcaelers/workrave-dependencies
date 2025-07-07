@@ -85,13 +85,24 @@ jobs:
       - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Cache OpenSSL build
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: openssl-${{ runner.os }}-${{ hashFiles('macos/build-openssl.sh') }}
+          restore-keys: |
+            openssl-${{ runner.os }}-
+
       - name: Clean previous build
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
         run: |
           cd macos
           rm -rf _source/openssl _build/openssl _deploy/dependencies
           echo "Cleaned previous OpenSSL build artifacts"
 
       - name: Build OpenSSL
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
         run: |
           cd macos
           ./build-openssl.sh
@@ -117,25 +128,38 @@ jobs:
       - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Cache Boost build
+        id: cache-boost
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: boost-${{ runner.os }}-${{ hashFiles('macos/build-boost.sh', 'macos/build-icu.sh', 'macos/build-openssl.sh') }}
+          restore-keys: |
+            boost-${{ runner.os }}-
+
       - name: Clean previous build
+        if: steps.cache-boost.outputs.cache-hit != 'true'
         run: |
           cd macos
           rm -rf _source/boost _build/boost _deploy/dependencies _ext/dependencies
           echo "Cleaned previous Boost build artifacts"
 
       - name: Download ICU artifacts
+        if: steps.cache-boost.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: icu-dependencies-macos
           path: macos/_ext/dependencies/
 
       - name: Download OpenSSL artifacts
+        if: steps.cache-boost.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: openssl-dependencies-macos
           path: macos/_ext/dependencies/
 
       - name: Build Boost
+        if: steps.cache-boost.outputs.cache-hit != 'true'
         run: |
           cd macos
           ./build-boost.sh
@@ -158,23 +182,36 @@ jobs:
       - name: Update xcode
         run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Cache Fmt/Spdlog build
+        id: cache-fmt-spdlog
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: fmt-spdlog-${{ runner.os }}-${{ hashFiles('macos/build-fmt.sh', 'macos/build-spdlog.sh') }}
+          restore-keys: |
+            fmt-spdlog-${{ runner.os }}-
+
       - name: Clean previous build
+        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
         run: |
           cd macos
           rm -rf _source/fmt _build/fmt _source/spdlog _build/spdlog _deploy/dependencies
           echo "Cleaned previous Fmt/Spdlog build artifacts"
 
       - name: Setup build env
+        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
         run: |
           brew install ninja
           brew outdated cmake || brew upgrade cmake
 
       - name: Build Fmt
+        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
         run: |
           cd macos
           ./build-fmt.sh
 
       - name: Build Spdlog
+        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
         run: |
           cd macos
           ./build-spdlog.sh
