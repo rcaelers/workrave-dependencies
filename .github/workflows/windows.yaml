@@ -103,27 +103,26 @@ jobs:
           name: workrave-mingw-packages
           path: .
 
-      - name: Generate release tag and name
-        id: release_info
+      - name: Set release info
+        id: check_release
         shell: bash
         run: |
+          # Always use windows-latest tag for Windows builds
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            # For tags, use the tag name
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=Workrave Windows Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "target_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "target_name=Workrave Windows Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           else
-            # For pushes, always use 'windows-latest' tag
-            echo "tag=windows-latest" >> $GITHUB_OUTPUT
-            echo "name=Workrave Windows Dependencies (Latest)" >> $GITHUB_OUTPUT
+            echo "target_tag=windows-latest" >> $GITHUB_OUTPUT
+            echo "target_name=Workrave Windows Dependencies (Latest)" >> $GITHUB_OUTPUT
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           fi
 
           # Generate build date
           echo "build_date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Delete existing latest release
-        if: github.ref_type != 'tag'
+      - name: Delete existing windows-latest release
+        if: steps.check_release.outputs.target_tag == 'windows-latest'
         shell: bash
         run: |
           # Delete the windows-latest release and tag if it exists (for push events only)
@@ -138,15 +137,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.release_info.outputs.tag }}
-          release_name: ${{ steps.release_info.outputs.name }}
+          tag_name: ${{ steps.check_release.outputs.target_tag }}
+          release_name: ${{ steps.check_release.outputs.target_name }}
           body: |
-            Workrave Windows dependencies built on ${{ steps.release_info.outputs.build_date }}
+            Workrave Windows dependencies built on ${{ steps.check_release.outputs.build_date }}
 
             Commit: ${{ github.sha }}
             ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ steps.release_info.outputs.is_prerelease }}
+          prerelease: ${{ steps.check_release.outputs.is_prerelease || 'true' }}
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1

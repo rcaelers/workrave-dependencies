@@ -292,30 +292,29 @@ jobs:
           echo "Archive contents:"
           tar -tzf workrave-dependencies-macos.tar.gz | head -20
 
-      - name: Generate release tag and name
+      - name: Set release info
         id: release_info
         run: |
+          # Always use macos-latest tag for macOS builds
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            # For tags, use the tag name
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "name=Workrave Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "target_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "target_name=Workrave macOS Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           else
-            # For pushes, always use 'latest' tag
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "name=Workrave Dependencies (Latest)" >> $GITHUB_OUTPUT
+            echo "target_tag=macos-latest" >> $GITHUB_OUTPUT
+            echo "target_name=Workrave macOS Dependencies (Latest)" >> $GITHUB_OUTPUT
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           fi
 
           # Generate build date
           echo "build_date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
-      - name: Delete existing latest release
-        if: github.ref_type != 'tag'
+      - name: Delete existing macos-latest release
+        if: steps.release_info.outputs.target_tag == 'macos-latest'
         run: |
-          # Delete the latest release and tag if it exists (for push events only)
-          gh release delete latest --yes || true
-          git push --delete origin latest || true
+          # Delete the macos-latest release and tag if it exists (for push events only)
+          gh release delete macos-latest --yes || true
+          git push --delete origin macos-latest || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -325,8 +324,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.release_info.outputs.tag }}
-          release_name: ${{ steps.release_info.outputs.name }}
+          tag_name: ${{ steps.release_info.outputs.target_tag }}
+          release_name: ${{ steps.release_info.outputs.target_name }}
           body: |
             Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
 
@@ -343,7 +342,7 @@ jobs:
             Commit: ${{ github.sha }}
             ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ steps.release_info.outputs.is_prerelease }}
+          prerelease: ${{ steps.release_info.outputs.is_prerelease || 'true' }}
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
