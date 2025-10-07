@@ -7,7 +7,7 @@ permissions:
   actions: read # Needed for downloading artifacts
 
 env:
-  XCODE_VERSION: "16.4"
+  XCODE_VERSION: '26.0.1'
 
 concurrency:
   group: dependencies-build-${{ github.ref }}
@@ -18,22 +18,19 @@ on:
     branches:
       - main
     paths:
-      - "macos/**"
-      - ".github/workflows/macos.yaml"
+      - 'macos/**'
+      - '.github/workflows/macos.yaml'
   pull_request:
     branches:
       - main
     paths:
-      - "macos/**"
-      - ".github/workflows/macos.yaml"
+      - 'macos/**'
+      - '.github/workflows/macos.yaml'
   workflow_dispatch:
-  schedule:
-    # Weekly rebuild on Sundays at 2 AM UTC to get latest security updates
-    - cron: "0 2 * * 0"
 
 jobs:
   icu:
-    runs-on: macos-15
+    runs-on: macos-26
     name: build ICU
 
     steps:
@@ -75,7 +72,7 @@ jobs:
           retention-days: 1
 
   openssl:
-    runs-on: macos-15
+    runs-on: macos-26
     name: build OpenSSL
 
     steps:
@@ -115,7 +112,7 @@ jobs:
           retention-days: 1
 
   boost:
-    runs-on: macos-15
+    runs-on: macos-26
     name: build Boost
     needs:
       - icu
@@ -172,7 +169,7 @@ jobs:
           retention-days: 1
 
   fmt_and_spdlog:
-    runs-on: macos-15
+    runs-on: macos-26
     name: build Fmt/Spdlog
 
     steps:
@@ -224,7 +221,7 @@ jobs:
           retention-days: 1
 
   qt:
-    runs-on: macos-15
+    runs-on: macos-26
     name: build Qt
 
     steps:
@@ -270,7 +267,7 @@ jobs:
           retention-days: 1
 
   create_release:
-    runs-on: macos-15
+    runs-on: macos-26
     name: Create GitHub Release
     needs:
       - icu
@@ -356,40 +353,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
-        uses: actions/create-release@v1
-        id: create_release
+        run: |
+          echo "::group::Creating release"
+          gh release create ${{ steps.release_info.outputs.target_tag }} \
+            ./workrave-dependencies-macos.tar.gz \
+            --title "${{ steps.release_info.outputs.target_name }}" \
+            --notes "Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
+
+          This release contains all the dependencies needed for Workrave on macOS:
+          - ICU
+          - OpenSSL
+          - Boost
+          - Fmt
+          - Spdlog
+          - Qt
+
+          Built with Xcode 16.4 on macOS 15.
+
+          Commit: ${{ github.sha }}
+          ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}" \
+            ${{ steps.release_info.outputs.is_prerelease == 'true' && '--prerelease' || '' }}
+          echo "::endgroup::"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.release_info.outputs.target_tag }}
-          release_name: ${{ steps.release_info.outputs.target_name }}
-          body: |
-            Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
-
-            This release contains all the dependencies needed for Workrave on macOS:
-            - ICU
-            - OpenSSL
-            - Boost
-            - Fmt
-            - Spdlog
-            - Qt
-
-            Built with Xcode 16.4 on macOS 15.
-
-            Commit: ${{ github.sha }}
-            ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ steps.release_info.outputs.is_prerelease || 'true' }}
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./workrave-dependencies-macos.tar.gz
-          asset_name: workrave-dependencies-macos.tar.gz
-          asset_content_type: application/gzip
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
@@ -397,7 +383,7 @@ jobs:
           subject-path: ./workrave-dependencies-macos.tar.gz
 
   cleanup_individual_artifacts:
-    runs-on: macos-15
+    runs-on: macos-26
     name: Cleanup individual artifacts
     needs:
       - create_release
