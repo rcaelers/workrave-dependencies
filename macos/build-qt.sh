@@ -9,10 +9,13 @@ source ${BASEDIR}/config.sh
 export CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm/lib
 
 cd ${SOURCEDIR}
-git clone git://code.qt.io/qt/qt5.git qt6
+if [ ! -d qt6 ]; then
+    git clone git://code.qt.io/qt/qt5.git qt6
+fi
 cd ${SOURCEDIR}/qt6
+git fetch origin --tags
 git checkout ${VERSION}
-perl ./init-repository --module-subset=qtbase,qtimageformats,qtsvg,qttools,qttranslations
+perl ./init-repository -f --module-subset=qtbase,qtimageformats,qtsvg,qttools,qttranslations
 
 rm -rf ${BUILDDIR}
 mkdir -p ${BUILDDIR}
@@ -31,7 +34,7 @@ ${SOURCEDIR}/qt6/configure \
     -nomake tests \
     -no-feature-relocatable \
     -rpath \
-    -c++std c++20 \
+    -c++std c++23 \
     -no-icu \
     --  \
     -G Ninja \

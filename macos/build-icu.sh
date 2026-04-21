@@ -9,8 +9,11 @@ source ${BASEDIR}/config.sh
 export CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm/lib
 
 cd ${SOURCEDIR}
-git clone https://github.com/unicode-org/icu.git
+if [ ! -d icu ]; then
+    git clone https://github.com/unicode-org/icu.git
+fi
 cd ${SOURCEDIR}/icu
+git fetch origin --tags
 git checkout release-${VERSION}
 
 rm -rf ${BUILDDIR}

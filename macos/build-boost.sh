@@ -14,8 +14,10 @@ fi
 rm -rf ${SOURCEDIR}/boost_${VERSION_UNDERSCORES}
 
 cd ${SOURCEDIR}
-curl -OL https://archives.boost.io/release/${VERSION}/source/boost_${VERSION_UNDERSCORES}.7z
-7z x ${SOURCEDIR}/boost_${VERSION_UNDERSCORES}.7z
+if [ ! -f boost_${VERSION_UNDERSCORES}.7z ]; then
+    curl -OL https://archives.boost.io/release/${VERSION}/source/boost_${VERSION_UNDERSCORES}.7z
+fi
+7z x -y ${SOURCEDIR}/boost_${VERSION_UNDERSCORES}.7z
 
 cd ${SOURCEDIR}/boost_${VERSION_UNDERSCORES}
 ./bootstrap.sh --prefix=${DEPLOYDIR} --with-icu=${EXTDIR}

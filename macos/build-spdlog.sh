@@ -6,13 +6,15 @@ VERSION=v1.15.3
 BASEDIR=$(dirname "$0")
 source ${BASEDIR}/config.sh
 
-rm -rf ${SOURCEDIR}
 rm -rf ${BUILDDIR}
 mkdir -p ${DEPLOYDIR} ${SOURCEDIR} ${BUILDDIR}
 
 cd ${SOURCEDIR}
-git clone https://github.com/gabime/spdlog.git
+if [ ! -d spdlog ]; then
+    git clone https://github.com/gabime/spdlog.git
+fi
 cd ${SOURCEDIR}/spdlog
+git fetch origin --tags
 git checkout ${VERSION}
 
 cd ${BUILDDIR}
