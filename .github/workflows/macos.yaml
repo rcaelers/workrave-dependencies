@@ -29,48 +29,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  icu:
-    runs-on: macos-26
-    name: build ICU
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache ICU build
-        id: cache-icu
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: icu-${{ runner.os }}-${{ hashFiles('macos/build-icu.sh') }}
-          restore-keys: |
-            icu-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-icu.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/icu _build/icu _deploy/dependencies
-          echo "Cleaned previous ICU build artifacts"
-
-      - name: Build ICU
-        if: steps.cache-icu.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          echo "::group::Building ICU"
-          ./build-icu.sh
-          echo "::endgroup::"
-
-      - name: Upload ICU artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: icu-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
   openssl:
     runs-on: macos-26
     name: build OpenSSL
@@ -114,9 +72,6 @@ jobs:
   boost:
     runs-on: macos-26
     name: build Boost
-    needs:
-      - icu
-      - openssl
 
     steps:
       - name: Checkout
@@ -130,7 +85,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: macos/_deploy/dependencies
-          key: boost-${{ runner.os }}-${{ hashFiles('macos/build-boost.sh', 'macos/build-icu.sh', 'macos/build-openssl.sh') }}
+          key: boost-${{ runner.os }}-${{ hashFiles('macos/build-boost.sh') }}
           restore-keys: |
             boost-${{ runner.os }}-
 
@@ -138,22 +93,8 @@ jobs:
         if: steps.cache-boost.outputs.cache-hit != 'true'
         run: |
           cd macos
-          rm -rf _source/boost _build/boost _deploy/dependencies _ext/dependencies
+          rm -rf _source/boost _build/boost _deploy/dependencies
           echo "Cleaned previous Boost build artifacts"
-
-      - name: Download ICU artifacts
-        if: steps.cache-boost.outputs.cache-hit != 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: icu-dependencies-macos
-          path: macos/_ext/dependencies/
-
-      - name: Download OpenSSL artifacts
-        if: steps.cache-boost.outputs.cache-hit != 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: openssl-dependencies-macos
-          path: macos/_ext/dependencies/
 
       - name: Build Boost
         if: steps.cache-boost.outputs.cache-hit != 'true'
@@ -220,6 +161,107 @@ jobs:
           path: macos/_deploy/dependencies/
           retention-days: 1
 
+  gtest:
+    runs-on: macos-26
+    name: build GTest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update xcode
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache GTest build
+        id: cache-gtest
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: gtest-${{ runner.os }}-${{ hashFiles('macos/build-gtest.sh') }}
+          restore-keys: |
+            gtest-${{ runner.os }}-
+
+      - name: Clean previous build
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          rm -rf _source/gtest _build/gtest _deploy/dependencies
+          echo "Cleaned previous GTest build artifacts"
+
+      - name: Setup build env
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        run: |
+          brew install ninja
+          brew outdated cmake || brew upgrade cmake
+
+      - name: Build GTest
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          ./build-gtest.sh
+
+      - name: Upload GTest artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtest-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
+  grpc:
+    runs-on: macos-26
+    name: build gRPC/Protobuf
+    needs:
+      - openssl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update xcode
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache gRPC build
+        id: cache-grpc
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: grpc-${{ runner.os }}-${{ hashFiles('macos/build-grpc.sh', 'macos/build-openssl.sh') }}
+          restore-keys: |
+            grpc-${{ runner.os }}-
+
+      - name: Clean previous build
+        if: steps.cache-grpc.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          rm -rf _source/grpc _build/grpc _deploy/dependencies _ext/dependencies
+          echo "Cleaned previous gRPC build artifacts"
+
+      - name: Download OpenSSL artifacts
+        if: steps.cache-grpc.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-dependencies-macos
+          path: macos/_ext/dependencies/
+
+      - name: Setup build env
+        if: steps.cache-grpc.outputs.cache-hit != 'true'
+        run: |
+          brew install ninja
+          brew outdated cmake || brew upgrade cmake
+
+      - name: Build gRPC
+        if: steps.cache-grpc.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          ./build-grpc.sh
+
+      - name: Upload gRPC artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: grpc-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
   qt:
     runs-on: macos-26
     name: build Qt
@@ -270,10 +312,11 @@ jobs:
     runs-on: macos-26
     name: Create GitHub Release
     needs:
-      - icu
       - openssl
       - boost
       - fmt_and_spdlog
+      - gtest
+      - grpc
       - qt
 
     steps:
@@ -283,12 +326,6 @@ jobs:
       - name: Setup GitHub CLI
         run: |
           brew install gh
-
-      - name: Download ICU artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: icu-dependencies-macos
-          path: combined-dependencies/
 
       - name: Download OpenSSL artifacts
         uses: actions/download-artifact@v4
@@ -308,11 +345,28 @@ jobs:
           name: fmt-spdlog-dependencies-macos
           path: combined-dependencies/
 
+      - name: Download GTest artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: gtest-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download gRPC artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: grpc-dependencies-macos
+          path: combined-dependencies/
+
       - name: Download Qt artifacts
         uses: actions/download-artifact@v4
         with:
           name: qt-dependencies-macos
           path: combined-dependencies/
+
+      - name: Check for Homebrew linkage
+        run: |
+          cd macos
+          ./check-no-homebrew-links.sh ../combined-dependencies
 
       - name: Create archive
         run: |
@@ -361,11 +415,13 @@ jobs:
             --notes "Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
 
           This release contains all the dependencies needed for Workrave on macOS:
-          - ICU
           - OpenSSL
           - Boost
           - Fmt
           - Spdlog
+          - GTest
+          - Protobuf
+          - gRPC
           - Qt
 
           Built with Xcode 16.4 on macOS 15.
@@ -390,12 +446,6 @@ jobs:
     if: always()
 
     steps:
-      - name: Delete ICU artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: icu-dependencies-macos
-        continue-on-error: true
-
       - name: Delete OpenSSL artifacts
         uses: geekyeggo/delete-artifact@v5
         with:
@@ -412,6 +462,18 @@ jobs:
         uses: geekyeggo/delete-artifact@v5
         with:
           name: fmt-spdlog-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete GTest artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: gtest-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete gRPC artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: grpc-dependencies-macos
         continue-on-error: true
 
       - name: Delete Qt artifacts

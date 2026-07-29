@@ -30,5 +30,5 @@ LDFLAGS="-headerpad_max_install_names -mmacosx-version-min=11.0" \
         --enable-static \
         --with-library-bits=64 \
 
-make
+make -j$(sysctl -n hw.ncpu)
 make install

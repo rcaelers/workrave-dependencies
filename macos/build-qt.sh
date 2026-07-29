@@ -15,13 +15,12 @@ fi
 cd ${SOURCEDIR}/qt6
 git fetch origin --tags
 git checkout ${VERSION}
-perl ./init-repository -f --module-subset=qtbase,qtimageformats,qtsvg,qttools,qttranslations
+perl ./init-repository -f --module-subset=qtbase,qtdeclarative,qtimageformats,qtsvg,qttools,qttranslations
 
 rm -rf ${BUILDDIR}
 mkdir -p ${BUILDDIR}
 
 export PKG_CONFIG_PATH="${DEPLOYDIR}/lib/pkgconfig"
-export ICU_ROOT=${DEPLOYDIR} 
 export DYLD_LIBRARY_PATH="${DEPLOYDIR}/lib"
 
 cd ${BUILDDIR}
@@ -39,7 +38,6 @@ ${SOURCEDIR}/qt6/configure \
     --  \
     -G Ninja \
     -Wno-dev \
-    -DICU_PREFIX=${DEPLOYDIR} \
     -DCMAKE_INSTALL_PREFIX=${DEPLOYDIR} \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_FIND_FRAMEWORK=FIRST \
