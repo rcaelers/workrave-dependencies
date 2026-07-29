@@ -27,11 +27,25 @@ options=('staticlibs')
 source=("grpc-${pkgver}.tar.gz::https://github.com/grpc/grpc/archive/refs/tags/v${pkgver}.tar.gz"
         "enable-mingw-af-unix.cmake"
         "WorkraveGrpcConfig.cmake")
+noextract=("grpc-${pkgver}.tar.gz")
 sha256sums=('90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d'
             'd4ba85995eb3a861d9accd1a1479b1818330861c232946ddab8944b2d029a42e'
             '6a17c941b5a2827c09c92936d184b398588419cc08938e7543c6748c0e542644')
 
 prepare() {
+  # MSYS2's default winsymlinks:deepcopy mode cannot extract a symlink before
+  # its target. These seven links precede their targets in GitHub's archive and
+  # are used only by the disabled gRPC test suite. Extract everything else
+  # without requiring Developer Mode or native-symlink privileges.
+  bsdtar -xf "${srcdir}/grpc-${pkgver}.tar.gz" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls/ab06acdd.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls/b9322cac.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls_missing_intermediate/ab06acdd.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls_missing_root/b9322cac.r0" \
+    --exclude "grpc-${pkgver}/test/core/util/http_client/python_wrapper.sh" \
+    --exclude "grpc-${pkgver}/test/distrib/bazel/cpp/tools/bazel" \
+    --exclude "grpc-${pkgver}/test/distrib/bazel/python/tools/bazel"
+
   cmake \
     -DGRPC_SOURCE_DIR="${srcdir}/grpc-${pkgver}" \
     -P "${srcdir}/enable-mingw-af-unix.cmake"
