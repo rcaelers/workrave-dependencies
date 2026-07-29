@@ -1,6 +1,6 @@
 # Enable the Windows AF_UNIX implementation already present in gRPC when the
-# library is compiled with MinGW. Current MinGW-w64 provides afunix.h, but gRPC
-# 1.83.0 still disables this implementation through a preprocessor guard.
+# library is compiled with MinGW. Current MinGW-w64 provides the required API,
+# but gRPC 1.83.0 disables it and assumes definitions from the Windows SDK.
 
 if(NOT DEFINED GRPC_SOURCE_DIR)
   message(FATAL_ERROR "GRPC_SOURCE_DIR was not provided")
@@ -35,3 +35,45 @@ else()
   endif()
   message(STATUS "gRPC Windows AF_UNIX support was already enabled")
 endif()
+
+# gRPC includes ws2def.h before afunix.h. That is sufficient with the Windows
+# SDK, but MinGW-w64's intentionally minimal ws2def.h does not declare
+# ADDRESS_FAMILY; its winsock2.h does. Patch every audited AF_UNIX include site
+# to use the complete MinGW Winsock declarations.
+set(_grpc_af_unix_sources
+  "src/core/lib/address_utils/parse_address.cc"
+  "src/core/lib/address_utils/sockaddr_utils.cc"
+  "src/core/lib/event_engine/posix_engine/set_socket_dualstack.cc"
+  "src/core/lib/event_engine/posix_engine/tcp_socket_utils.cc"
+  "src/core/lib/event_engine/tcp_socket_utils.cc"
+  "src/core/lib/event_engine/windows/windows_listener.h"
+  "src/core/lib/iomgr/unix_sockets_posix.cc")
+set(_grpc_windows_sdk_headers "#include <ws2def.h>\n#include <afunix.h>")
+set(_grpc_mingw_headers "#include <winsock2.h>\n#include <afunix.h>")
+
+foreach(_grpc_relative_source IN LISTS _grpc_af_unix_sources)
+  set(_grpc_source "${GRPC_SOURCE_DIR}/${_grpc_relative_source}")
+  if(NOT EXISTS "${_grpc_source}")
+    message(FATAL_ERROR "gRPC AF_UNIX source not found: ${_grpc_source}")
+  endif()
+
+  file(READ "${_grpc_source}" _grpc_source_contents)
+  string(FIND "${_grpc_source_contents}" "${_grpc_windows_sdk_headers}" _grpc_headers_position)
+  if(NOT _grpc_headers_position EQUAL -1)
+    string(REPLACE
+      "${_grpc_windows_sdk_headers}"
+      "${_grpc_mingw_headers}"
+      _grpc_source_contents
+      "${_grpc_source_contents}")
+    file(WRITE "${_grpc_source}" "${_grpc_source_contents}")
+  else()
+    string(FIND "${_grpc_source_contents}" "${_grpc_mingw_headers}" _grpc_headers_position)
+    if(_grpc_headers_position EQUAL -1)
+      message(FATAL_ERROR
+        "The gRPC AF_UNIX includes no longer match the audited source. "
+        "Review ${_grpc_source} before updating gRPC.")
+    endif()
+  endif()
+endforeach()
+
+message(STATUS "Enabled MinGW Winsock declarations for gRPC AF_UNIX sources")

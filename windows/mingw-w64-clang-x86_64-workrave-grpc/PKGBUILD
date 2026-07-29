@@ -29,7 +29,7 @@ source=("grpc-${pkgver}.tar.gz::https://github.com/grpc/grpc/archive/refs/tags/v
         "WorkraveGrpcConfig.cmake")
 noextract=("grpc-${pkgver}.tar.gz")
 sha256sums=('90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d'
-            'd4ba85995eb3a861d9accd1a1479b1818330861c232946ddab8944b2d029a42e'
+            '943b1aff7ac94cbe6dd0c070975e6c82d0efaf8c23619504ecce798a80913bda'
             '6a17c941b5a2827c09c92936d184b398588419cc08938e7543c6748c0e542644')
 
 prepare() {
@@ -63,7 +63,7 @@ build() {
   # deprecated by libc++, while removing the ANSI stdio override avoids broken
   # PRI* formatting in gRPC log calls.
   CXXFLAGS="${CXXFLAGS//-Wp,-D__USE_MINGW_ANSI_STDIO=1/}"
-  CXXFLAGS+=" -DSTRSAFE_NO_DEPRECATE -Wno-deprecated-declarations"
+  CXXFLAGS+=" -DSTRSAFE_NO_DEPRECATE -Wno-deprecated-declarations -Wno-unknown-attributes"
 
   MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
   "${MINGW_PREFIX}/bin/cmake.exe" \
