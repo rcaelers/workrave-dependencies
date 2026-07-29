@@ -1,0 +1,107 @@
+name: Workrave Windows gRPC dependency
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: write
+
+concurrency:
+  group: windows-grpc-dependency-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "windows/build-grpc.sh"
+      - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
+      - ".github/workflows/windows-grpc.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "windows/build-grpc.sh"
+      - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
+      - ".github/workflows/windows-grpc.yaml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    name: Build patched gRPC 1.83.0 package
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-clang-x86_64-abseil-cpp
+            mingw-w64-clang-x86_64-c-ares
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-gcc-compat
+            mingw-w64-clang-x86_64-lld
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-openssl
+            mingw-w64-clang-x86_64-pkg-config
+            mingw-w64-clang-x86_64-protobuf
+            mingw-w64-clang-x86_64-re2
+            mingw-w64-clang-x86_64-zlib
+
+      - name: Build gRPC package
+        run: bash windows/build-grpc.sh
+
+      - name: Upload gRPC package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workrave-grpc-mingw-clang64
+          path: windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
+          retention-days: 14
+
+      - name: Generate artifact attestation
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    name: Publish latest gRPC package
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download gRPC package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workrave-grpc-mingw-clang64
+          path: .
+
+      - name: Replace windows-grpc-latest release
+        shell: bash
+        run: |
+          gh release delete windows-grpc-latest --yes || true
+          git push --delete origin windows-grpc-latest || true
+          gh release create windows-grpc-latest \
+            ./workrave-grpc-mingw-clang64.pkg.tar.zst \
+            --target "${{ github.sha }}" \
+            --title "Workrave gRPC 1.83.0 for MinGW CLANG64" \
+            --notes "Static gRPC 1.83.0 with MinGW AF_UNIX support, built against MSYS2 package dependencies.\n\nCommit: ${{ github.sha }}" \
+            --prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

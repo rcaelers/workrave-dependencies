@@ -16,12 +16,16 @@ on:
       - main
     paths:
       - "windows/**"
+      - "!windows/build-grpc.sh"
+      - "!windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows.yaml"
   pull_request:
     branches:
       - main
     paths:
       - "windows/**"
+      - "!windows/build-grpc.sh"
+      - "!windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows.yaml"
   workflow_dispatch:
 

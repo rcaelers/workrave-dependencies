@@ -1,0 +1,91 @@
+# Maintainer: Rob Caelers <rob dot caelers at gmail dot com>
+
+_realname=workrave-grpc
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=1.83.0
+pkgrel=1
+pkgdesc="Static gRPC with MinGW AF_UNIX support for Workrave"
+arch=('any')
+mingw_arch=('clang64')
+url="https://grpc.io/"
+license=('spdx:Apache-2.0')
+depends=("${MINGW_PACKAGE_PREFIX}-cc-libs"
+         "${MINGW_PACKAGE_PREFIX}-abseil-cpp"
+         "${MINGW_PACKAGE_PREFIX}-c-ares"
+         "${MINGW_PACKAGE_PREFIX}-openssl"
+         "${MINGW_PACKAGE_PREFIX}-protobuf"
+         "${MINGW_PACKAGE_PREFIX}-re2"
+         "${MINGW_PACKAGE_PREFIX}-zlib")
+makedepends=("${MINGW_PACKAGE_PREFIX}-cc"
+             "${MINGW_PACKAGE_PREFIX}-cmake"
+             "${MINGW_PACKAGE_PREFIX}-ninja"
+             "${MINGW_PACKAGE_PREFIX}-pkgconf")
+provides=("${MINGW_PACKAGE_PREFIX}-grpc=${pkgver}")
+conflicts=("${MINGW_PACKAGE_PREFIX}-grpc")
+options=('staticlibs')
+source=("grpc-${pkgver}.tar.gz::https://github.com/grpc/grpc/archive/refs/tags/v${pkgver}.tar.gz"
+        "enable-mingw-af-unix.cmake"
+        "WorkraveGrpcConfig.cmake")
+sha256sums=('90d453393a9d41215df546103b10b33b9566df79cdf6f49dc67f6c4d044d090d'
+            'd4ba85995eb3a861d9accd1a1479b1818330861c232946ddab8944b2d029a42e'
+            '6a17c941b5a2827c09c92936d184b398588419cc08938e7543c6748c0e542644')
+
+prepare() {
+  cmake \
+    -DGRPC_SOURCE_DIR="${srcdir}/grpc-${pkgver}" \
+    -P "${srcdir}/enable-mingw-af-unix.cmake"
+}
+
+build() {
+  declare -a extra_config
+  if check_option "debug" "y"; then
+    extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
+  else
+    extra_config+=("-DCMAKE_BUILD_TYPE=Release")
+  fi
+
+  # This MSYS2 compatibility define prevents strsafe.h from using declarations
+  # deprecated by libc++, while removing the ANSI stdio override avoids broken
+  # PRI* formatting in gRPC log calls.
+  CXXFLAGS="${CXXFLAGS//-Wp,-D__USE_MINGW_ANSI_STDIO=1/}"
+  CXXFLAGS+=" -DSTRSAFE_NO_DEPRECATE -Wno-deprecated-declarations"
+
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+  "${MINGW_PREFIX}/bin/cmake.exe" \
+    -S "${srcdir}/grpc-${pkgver}" -B "${srcdir}/build-${MSYSTEM}" -G Ninja \
+    -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_SKIP_RPATH=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DgRPC_INSTALL=ON \
+    -DgRPC_BUILD_TESTS=OFF \
+    -DgRPC_BUILD_CODEGEN=ON \
+    -DgRPC_DOWNLOAD_ARCHIVES=OFF \
+    -DgRPC_BUILD_GRPCPP_OTEL_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_CPP_PLUGIN=ON \
+    -DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_PHP_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF \
+    -DgRPC_ABSL_PROVIDER=package \
+    -DgRPC_CARES_PROVIDER=package \
+    -DgRPC_PROTOBUF_PROVIDER=package \
+    -DgRPC_RE2_PROVIDER=package \
+    -DgRPC_SSL_PROVIDER=package \
+    -DgRPC_ZLIB_PROVIDER=package \
+    "${extra_config[@]}"
+
+  "${MINGW_PREFIX}/bin/cmake.exe" --build "${srcdir}/build-${MSYSTEM}"
+}
+
+package() {
+  DESTDIR="${pkgdir}" "${MINGW_PREFIX}/bin/cmake.exe" --install "${srcdir}/build-${MSYSTEM}"
+
+  install -Dm644 "${srcdir}/WorkraveGrpcConfig.cmake" \
+    "${pkgdir}${MINGW_PREFIX}/lib/cmake/WorkraveGrpc/WorkraveGrpcConfig.cmake"
+  install -Dm644 "${srcdir}/grpc-${pkgver}/LICENSE" \
+    "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}
