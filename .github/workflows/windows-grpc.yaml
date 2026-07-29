@@ -17,6 +17,7 @@ on:
       - "windows/build-grpc.sh"
       - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows-grpc.yaml"
+      - ".gitattributes"
   pull_request:
     branches:
       - main
@@ -24,6 +25,7 @@ on:
       - "windows/build-grpc.sh"
       - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows-grpc.yaml"
+      - ".gitattributes"
   workflow_dispatch:
 
 jobs:

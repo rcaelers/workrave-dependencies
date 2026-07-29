@@ -15,8 +15,9 @@ pacman -U windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
 
 Changes to the build script, package recipe, or workflow publish the same
 package as the `windows-grpc-latest` GitHub release asset. Workrave detects the
-package through `WorkraveGrpcConfig.cmake`; if it is absent, Workrave retains
-its slower source-build fallback.
+package through `WorkraveGrpcConfig.cmake`. When cross-compiling, its capability
+marker supplies the Unix-domain-socket guarantee that cannot be tested by
+running a configure-time probe.
 
 Install the published package from an MSYS2 CLANG64 shell with:
 

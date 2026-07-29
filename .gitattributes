@@ -7,6 +7,9 @@ PKGBUILD text eol=lf
 # Shell scripts should have LF line endings
 *.sh text eol=lf
 
+# CMake scripts are package sources and their checksums must be platform-stable
+*.cmake text eol=lf
+
 # Windows batch files should have CRLF line endings
 *.bat text eol=crlf
 *.cmd text eol=crlf
