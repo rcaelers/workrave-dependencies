@@ -25,7 +25,7 @@
 #                           # run) — handy for resuming after fixing one
 #                           # script without rebuilding everything before it.
 #   ./build-all.sh --parallel
-#                           # openssl/boost/fmt/gtest/qt have no real
+#                           # openssl/boost/fmt/gtest/sqlite3/qt have no real
 #                           # cross-dependencies (each build-*.sh already
 #                           # saturates all cores on its own via Ninja/-j),
 #                           # so this only wins if you have enough idle
@@ -40,7 +40,7 @@
 BASEDIR=$(cd "$(dirname "$0")" && pwd)
 cd "${BASEDIR}"
 
-ORDER=(openssl boost fmt spdlog gtest grpc qt)
+ORDER=(openssl boost fmt spdlog gtest sqlite3 grpc qt)
 
 if [ "${1:-}" == "--parallel" ]; then
     LOGDIR=$(mktemp -d "${TMPDIR:-/tmp}/workrave-deps-build.XXXXXX")
@@ -66,7 +66,7 @@ if [ "${1:-}" == "--parallel" ]; then
 
     # Stage 1: no cross-dependencies among these. Stage 2: spdlog needs fmt,
     # grpc needs openssl — both satisfied once stage 1 finishes.
-    run_stage openssl boost fmt gtest qt || exit 1
+    run_stage openssl boost fmt gtest sqlite3 qt || exit 1
     run_stage spdlog grpc || exit 1
     ./check-no-homebrew-links.sh
     exit $?

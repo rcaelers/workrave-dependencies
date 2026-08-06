@@ -207,6 +207,46 @@ jobs:
           path: macos/_deploy/dependencies/
           retention-days: 1
 
+  sqlite3:
+    runs-on: macos-26
+    name: build SQLite
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update xcode
+        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache SQLite build
+        id: cache-sqlite3
+        uses: actions/cache@v4
+        with:
+          path: macos/_deploy/dependencies
+          key: sqlite3-${{ runner.os }}-${{ hashFiles('macos/build-sqlite3.sh') }}
+          restore-keys: |
+            sqlite3-${{ runner.os }}-
+
+      - name: Clean previous build
+        if: steps.cache-sqlite3.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          rm -rf _source/sqlite3 _build/sqlite3 _deploy/dependencies
+          echo "Cleaned previous SQLite build artifacts"
+
+      - name: Build SQLite
+        if: steps.cache-sqlite3.outputs.cache-hit != 'true'
+        run: |
+          cd macos
+          ./build-sqlite3.sh
+
+      - name: Upload SQLite artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlite3-dependencies-macos
+          path: macos/_deploy/dependencies/
+          retention-days: 1
+
   grpc:
     runs-on: macos-26
     name: build gRPC/Protobuf
@@ -316,6 +356,7 @@ jobs:
       - boost
       - fmt_and_spdlog
       - gtest
+      - sqlite3
       - grpc
       - qt
 
@@ -349,6 +390,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: gtest-dependencies-macos
+          path: combined-dependencies/
+
+      - name: Download SQLite artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sqlite3-dependencies-macos
           path: combined-dependencies/
 
       - name: Download gRPC artifacts
@@ -420,6 +467,7 @@ jobs:
           - Fmt
           - Spdlog
           - GTest
+          - SQLite
           - Protobuf
           - gRPC
           - Qt
@@ -468,6 +516,12 @@ jobs:
         uses: geekyeggo/delete-artifact@v5
         with:
           name: gtest-dependencies-macos
+        continue-on-error: true
+
+      - name: Delete SQLite artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: sqlite3-dependencies-macos
         continue-on-error: true
 
       - name: Delete gRPC artifacts
