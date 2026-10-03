@@ -1,0 +1,32 @@
+include(qt-options)
+
+[settings]
+os=Windows
+compiler=clang
+compiler.version=23
+compiler.libcxx=libc++
+compiler.cppstd=20
+build_type=RelWithDebInfo
+
+[options]
+# Workrave, the Unfold updater, and Boost.Test dependencies.
+{% for library in ["charconv", "chrono", "cobalt", "contract", "coroutine", "fiber", "graph", "graph_parallel", "iostreams", "locale", "log", "math", "mpi", "nowide", "python", "random", "stacktrace", "thread", "timer", "type_erasure", "wave"] %}
+boost/*:without_{{ library }}=True
+{% endfor %}
+boost/*:zlib=False
+boost/*:bzip2=False
+boost/*:pch=False
+
+[conf]
+tools.build:cflags=["-g", "-gcodeview"]
+tools.build:cxxflags=["-g", "-gcodeview"]
+tools.build:sharedlinkflags=["-Wl,--pdb="]
+tools.build:exelinkflags=["-Wl,--pdb="]
+tools.cmake.cmaketoolchain:system_name=Windows
+# Workrave uses fmt headers; its optional C++ module fails with libc++ 23.
+fmt/*:tools.cmake.cmaketoolchain:extra_variables={"FMT_MODULE": False}
+tools.cmake.cmaketoolchain:extra_variables={"CMAKE_MODULE_LINKER_FLAGS": "-Wl,--pdb="}
+qt/*:tools.cmake.cmaketoolchain:extra_variables={"CMAKE_MODULE_LINKER_FLAGS": "-Wl,--pdb=", "CMAKE_PROJECT_INCLUDE": "{{ os.getenv('CONAN_HOME') }}/workrave/qt-required-modules.cmake"}
+# Include the toolchain release and symbol policy in every target package ID.
+user.workrave:toolchain=llvm-mingw-20260922-ucrt-pdb-v1
+tools.info.package_id:confs=["user.workrave:toolchain"]

@@ -1,0 +1,20 @@
+include(windows-llvm-mingw)
+
+{% set root = os.getenv("LLVM_MINGW_ROOT", "/opt/llvm-mingw") %}
+{% set prefix = root + "/bin/x86_64-w64-mingw32-" %}
+
+[settings]
+arch=x86_64
+
+[conf]
+tools.build:compiler_executables={"c": "{{ prefix }}clang", "cpp": "{{ prefix }}clang++", "rc": "{{ prefix }}windres"}
+tools.cmake.cmaketoolchain:system_processor=x86_64
+tools.gnu:host_triplet=x86_64-w64-mingw32
+
+[buildenv]
+CC={{ prefix }}clang
+CXX={{ prefix }}clang++
+AR={{ root }}/bin/llvm-ar
+RANLIB={{ root }}/bin/llvm-ranlib
+RC={{ prefix }}windres
+STRIP={{ root }}/bin/llvm-strip

@@ -1,0 +1,31 @@
+name: Conan cross-build configuration
+
+on:
+  pull_request:
+    paths:
+      - 'conan/**'
+      - '.github/workflows/conan.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'conan/**'
+      - '.github/workflows/conan.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Linux cross-compiler image
+        run: docker build -t workrave-dependencies:llvm-mingw conan
+      - name: Check symbols and both locked dependency graphs
+        run: |
+          docker run --rm -v "$PWD:/work" workrave-dependencies:llvm-mingw \
+            sh -ec '
+              python3 conan/build.py --check
+              python3 -m unittest discover -s conan/tests -v
+            '

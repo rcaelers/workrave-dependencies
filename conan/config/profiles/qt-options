@@ -1,0 +1,24 @@
+[options]
+qt/*:qtdeclarative=True
+# Qt Quick is silently omitted without the qsb shader compiler.
+qt/*:qtshadertools=True
+qt/*:qtimageformats=True
+qt/*:qtsvg=True
+qt/*:qttools=True
+qt/*:qttranslations=True
+qt/*:with_icu=False
+qt/*:with_fontconfig=False
+qt/*:with_x11=False
+qt/*:with_pq=False
+qt/*:with_odbc=False
+qt/*:with_brotli=False
+qt/*:with_sqlite3=False
+qt/*:with_harfbuzz=True
+qt/*:with_freetype=True
+qt/*:with_md4c=False
+harfbuzz/*:with_glib=False
+
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja
+tools.gnu:pkg_config=/usr/bin/pkg-config
+tools.build:skip_test=True

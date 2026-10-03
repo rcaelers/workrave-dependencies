@@ -1,0 +1,4 @@
+# LLVM 23 is newer than the settings shipped in Conan 2.32.
+compiler:
+  clang:
+    version: ["23"]

@@ -1,0 +1,11 @@
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -1649,7 +1649,7 @@
+         if is_msvc(self):
+             return "clang-win" if self.settings.compiler.get_safe("toolset") == "ClangCL" else "msvc"
+         if self.settings.os == "Windows" and self.settings.compiler == "clang":
+-            return "clang-win"
++            return "clang-win" if self.settings.get_safe("compiler.runtime") else "gcc"
+         if self.settings.os == "Emscripten" and self.settings.compiler in ("clang", "emcc"):
+             return "emscripten"
+         if self.settings.compiler == "gcc" and is_apple_os(self):

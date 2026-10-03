@@ -1,5 +1,18 @@
 # Windows dependencies
 
+## Linux cross-build with Conan
+
+See [`conan/README.md`](../conan/README.md) for the new Qt dependency build
+using llvm-mingw on Linux, with x64/ARM64 profiles and matching PDB archives.
+
+## Native Windows build containers
+
+See [workrave-build-containers](https://github.com/rcaelers/workrave-build-containers)
+for the MSYS2 GTK and
+native llvm-mingw/Conan Qt images used by Workrave's release pipeline. Both
+compile and package Workrave on Windows; the Qt dependency SDK is built and
+cached separately on Linux.
+
 ## Patched gRPC for CLANG64
 
 `build-grpc.sh` creates a pacman package containing static gRPC 1.83.0 with

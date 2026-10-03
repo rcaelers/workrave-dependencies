@@ -1,0 +1,11 @@
+# Fail before compilation if Qt silently omitted a required Workrave module.
+if(PROJECT_NAME STREQUAL "Qt")
+  function(workrave_check_qt_modules)
+    foreach(module Quick QuickControls2 QuickWidgets Svg)
+      if(NOT TARGET Qt::${module})
+        message(FATAL_ERROR "Required Workrave dependency Qt::${module} was not configured")
+      endif()
+    endforeach()
+  endfunction()
+  cmake_language(DEFER CALL workrave_check_qt_modules)
+endif()

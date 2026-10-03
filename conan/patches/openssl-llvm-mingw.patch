@@ -1,0 +1,23 @@
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -105,7 +105,10 @@
+ 
+     @property
+     def _is_mingw(self):
+-        return self.settings.os == "Windows" and self.settings.compiler == "gcc"
++        return self.settings.os == "Windows" and (
++            self.settings.compiler == "gcc" or
++            (self.settings.compiler == "clang" and not self.settings.get_safe("compiler.runtime"))
++        )
+ 
+     @property
+     def _use_nmake(self):
+@@ -344,6 +347,8 @@
+     def _ancestor_target(self):
+         if "CONAN_OPENSSL_CONFIGURATION" in os.environ:
+             return os.environ["CONAN_OPENSSL_CONFIGURATION"]
++        if self._is_mingw:
++            return {"x86": "mingw", "x86_64": "mingw64", "armv8": "mingwarm64"}[str(self.settings.arch)]
+         compiler = "Visual Studio" if self.settings.compiler == "msvc" else self.settings.compiler
+         query = f"{self.settings.os}-{self.settings.arch}-{compiler}"
+         ancestor = next((self._targets[i] for i in self._targets if fnmatch.fnmatch(query, i)), None)

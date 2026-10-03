@@ -1,0 +1,19 @@
+include(qt-options)
+
+[settings]
+os=Linux
+arch=x86_64
+compiler=gcc
+compiler.version=15
+compiler.libcxx=libstdc++11
+# Qt requires GNU mode for libstdc++'s 128-bit integer traits.
+compiler.cppstd=gnu20
+build_type=Release
+
+[options]
+qt/*:shared=True
+qt/*:openssl=False
+
+[buildenv]
+CC=/usr/bin/gcc
+CXX=/usr/bin/g++
