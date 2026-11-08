@@ -1,0 +1,15 @@
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -169,6 +169,12 @@
+         )
+ 
+     def build(self):
++        if self.settings.os == "Windows" and self.settings.arch == "armv8":
++            # Backport protobuf #24897: alignment inside a function prevents
++            # LLVM from generating Windows ARM64 SEH unwind information.
++            replace_in_file(self, os.path.join(self.source_folder, "upb", "wire", "encode.c"),
++                            '      ".p2align " UPB_BTI_SHIFT_IMM',
++                            '      #ifndef __SEH__\n      ".p2align " UPB_BTI_SHIFT_IMM\n      #endif')
+         cmake = CMake(self)
+         cmake.configure()
+         cmake.build()

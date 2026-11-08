@@ -1,0 +1,65 @@
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -6,7 +6,7 @@
+ from conan.tools.apple import is_apple_os
+ from conan.tools.build import cross_building, valid_min_cppstd, check_min_cppstd
+ from conan.tools.cmake import cmake_layout, CMake, CMakeToolchain, CMakeDeps
+-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, rename, replace_in_file, rmdir
++from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, load, rename, replace_in_file, rmdir, save
+ from conan.tools.microsoft import check_min_vs, is_msvc
+ from conan.tools.scm import Version
+ 
+@@ -77,6 +77,8 @@
+     def export_sources(self):
+         copy(self, "conan_cmake_project_include.cmake", self.recipe_folder, os.path.join(self.export_sources_folder, "src"))
+         copy(self, f"cmake/{self._grpc_plugin_template}", self.recipe_folder, os.path.join(self.export_sources_folder, "src"))
++        copy(self, "workrave-enable-mingw-af-unix.cmake", self.recipe_folder, os.path.join(self.export_sources_folder, "src", "cmake"))
++        copy(self, "WorkraveGrpcConfig.cmake.in", self.recipe_folder, os.path.join(self.export_sources_folder, "src", "cmake"))
+         export_conandata_patches(self)
+ 
+     def config_options(self):
+@@ -172,6 +174,13 @@
+         # Let Conan define CMAKE_MSVC_RUNTIME_LIBRARY
+         replace_in_file(self, os.path.join(self.source_folder, "CMakeLists.txt"), "include(cmake/msvc_static_runtime.cmake)", "")
+ 
++    @property
++    def _workrave_mingw_af_unix(self):
++        return self.settings.os == "Windows" and (
++            self.settings.compiler == "gcc" or
++            (self.settings.compiler == "clang" and not is_msvc(self))
++        )
++
+     def generate(self):
+         # This doesn't work yet as one would expect, because the install target builds everything
+         # and we need the install target because of the generated CMake files
+@@ -182,6 +191,11 @@
+         tc = CMakeToolchain(self)
+ 
+         tc.cache_variables["CMAKE_PROJECT_grpc_INCLUDE"] = os.path.join(self.source_folder, "conan_cmake_project_include.cmake")
++
++        if self._workrave_mingw_af_unix:
++            tc.cache_variables["GRPC_SOURCE_DIR"] = self.source_folder
++            tc.cache_variables["CMAKE_PROJECT_grpc_INCLUDE_BEFORE"] = os.path.join(
++                self.source_folder, "cmake", "workrave-enable-mingw-af-unix.cmake")
+ 
+         tc.cache_variables["gRPC_BUILD_CODEGEN"] = self.options.codegen
+         tc.cache_variables["gRPC_BUILD_CSHARP_EXT"] = self.options.csharp_ext
+@@ -294,6 +308,11 @@
+             if self.options.get_safe(option_name):
+                 self._create_executable_module_file(target, executable)
+ 
++        if self._workrave_mingw_af_unix:
++            template = load(self, os.path.join(self.source_folder, "cmake", "WorkraveGrpcConfig.cmake.in"))
++            save(self, os.path.join(self.package_folder, "lib", "cmake", "WorkraveGrpc", "WorkraveGrpcConfig.cmake"),
++                 template.replace("@GRPC_VERSION@", str(self.version)))
++
+     def _create_executable_module_file(self, target, executable):
+         module_abs_path = os.path.join(self.package_folder, self._module_path)
+ 
+@@ -373,3 +392,6 @@
+                 grpc_module_filename = "{}.cmake".format(executable)
+                 grpc_modules.append(os.path.join(self._module_path, grpc_module_filename))
+         self.cpp_info.set_property("cmake_build_modules", grpc_modules)
++        if self._workrave_mingw_af_unix:
++            self.cpp_info.components["grpc++"].builddirs.append(os.path.join("lib", "cmake", "WorkraveGrpc"))
++

@@ -3,7 +3,7 @@
 Shared Conan 2 recipes build the dependencies for Workrave's **Qt interface**:
 Windows x64/ARM64 cross-builds on Linux with llvm-mingw, and native macOS builds
 exported as a universal arm64+x86_64 SDK. Use Conan 2.34.0 or newer.
-The existing dependency builders remain available during the SDK migration.
+Conan builds both platform SDKs; legacy builders remain available until release cutover.
 
 ## macOS
 
@@ -30,7 +30,8 @@ pkg-config defaults from discovery. Each thin Qt package is checked for
 Homebrew linkage before the driver proceeds to the next stage.
 
 The same `conanfile.py` and version selections are used for Windows and macOS.
-macOS profiles enable gRPC/Protobuf, QtDBus and a broader Boost library set. Abseil is shared on macOS, matching the original shell build and ensuring
+Both platforms enable gRPC/Protobuf. macOS profiles additionally enable QtDBus
+and a broader Boost library set. Abseil is shared on macOS, matching the original shell build and ensuring
 protobuf/gRPC use one synchronization runtime. Static copies in separate dylibs
 caused gRPC server startup to stall, including in ASan/UBSan RPC tests.
 GoogleTest is also shared on macOS. This keeps its prebuilt STL implementation
@@ -38,7 +39,13 @@ separate from sanitizer-instrumented consumers, avoiding mixed vector
 annotations during test registration without disabling container checks.
 Cobalt is omitted on both platforms: Workrave does not use it and the
 upstream Boost 1.91 recipe expects an unconfigured Cobalt SSL library.
-OpenSSL uses the current compatible 3.x release because gRPC requires
+Windows uses static gRPC with the MinGW AF_UNIX source patch and
+`WorkraveGrpcConfig.cmake` capability marker supplied by a small overlay on the
+pinned Conan Center recipe. The patch is limited to MinGW Windows builds;
+macOS and native build-host generators use the upstream implementation.
+The Windows smoke build includes `dependencies-grpc-af-unix.exe`, which must
+run on Windows to verify a real Unix-domain-socket listener and connection.
+xmlsec is no longer required. OpenSSL uses the current compatible 3.x release because gRPC requires
 OpenSSL below version 4. Routine builds use committed, separate platform locks.
 
 The default build compiles each architecture separately, including matching
@@ -199,7 +206,8 @@ without compiling packages.
 The driver installs project configuration into `/cache/conan`, resolves the
 committed lockfile, builds missing packages, then compiles a small Qt application.
 That application checks the actual Workrave Qt components, native Linux
-`moc`, `rcc` and `lrelease`, and linkage to Boost, OpenSSL, fmt, spdlog and SQLite. The graph also supplies
+`moc`, `rcc`, `lrelease`, `protoc` and `grpc_cpp_plugin`, and linkage to
+Boost, OpenSSL, fmt, spdlog, SQLite and gRPC. The graph also supplies
 zlib for Crashpad and libxml2 for the updater.
 It is a build check; the Windows application is not executed on Linux.
 
@@ -208,7 +216,7 @@ Outputs in `conan/_build/windows-<arch>/`:
 | Output | Purpose |
 | --- | --- |
 | `build/RelWithDebInfo/generators/` | Conan CMake toolchain and dependency targets |
-| `smoke/` | Cross-compiled Qt test application and its PDB |
+| `smoke/` | Cross-compiled Qt application, AF_UNIX probe and their PDBs |
 | `symbols.tar.gz`, `symbols.json` | Dependency PDBs, module identities and binary checksums |
 | `runtime/` | Matching llvm-mingw C++/unwind/pthread runtime DLLs |
 | `graph.json`, `windows.lock` | Resolved package graph and recipe revisions |
@@ -257,6 +265,14 @@ pinned ConanCenter snapshot and applies small patches for the exceptions:
 * **Boost:** select B2's GNU driver/linker rules for Windows Clang without an
   MSVC runtime. This also produces the required MinGW import libraries.
 * **OpenSSL 3:** recognize llvm-mingw and select `mingw64` or `mingwarm64`.
+* **Abseil:** preserve the pthread link dependency in MinGW component metadata.
+* **Protobuf/UPB:** backport [protobuf #24897](https://github.com/protocolbuffers/protobuf/pull/24897)
+  to keep Windows ARM64 inline assembly compatible with SEH unwind generation.
+  The same fix is applied to gRPC's bundled UPB.
+* **gRPC:** enable its existing Windows AF_UNIX implementation for MinGW, use
+  MinGW Winsock declarations, complete Windows standard-library includes, and
+  export the Workrave capability config.
+  The patch checks the source layout and fails if an update needs review.
 * **Qt:** import the missing native QML tools and versionless tool aliases,
   handle the omitted `windeployqt` in Linux cross-builds, supply a missing
   `<vector>` include in 6.11.1, and use MinGW entry-point metadata for Clang.
@@ -347,8 +363,6 @@ native Windows Qt image. `windows.containers_dir` points at that container
 repository. Packaging and signing do not use Wine.
 
 ## Remaining migration work
-
-* Migrate Windows gRPC and its MinGW AF_UNIX capability marker to Conan.
 
 * Run the Qt application and a real Crashpad crash on Windows x64 and ARM64.
   Compile/link and PDB identity checks do not prove runtime crash symbolization.

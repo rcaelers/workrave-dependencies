@@ -114,6 +114,7 @@ def build(arch, jobs, export):
         "Ninja",
         f"-DCMAKE_TOOLCHAIN_FILE={generators / 'conan_toolchain.cmake'}",
         "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+        "-DWORKRAVE_SMOKE_GRPC=ON",
     )
     run("cmake", "--build", output / "smoke", "--parallel", jobs)
     probe = output / "smoke/package"
@@ -155,8 +156,9 @@ def build(arch, jobs, export):
 def validate(arch):
     """Validate the existing smoke build and all resolved package binaries/PDBs."""
     output = ROOT / "_build" / f"windows-{arch}"
-    if not (output / "smoke/package/bin/dependencies-smoke.exe").is_file():
-        raise RuntimeError("Missing Qt smoke build; compile and install it before validation")
+    for name in ("dependencies-smoke", "dependencies-grpc-af-unix"):
+        if not (output / f"smoke/package/bin/{name}.exe").is_file():
+            raise RuntimeError(f"Missing {name}.exe; compile and install the smoke build before validation")
     symbol_helper().retain_symbols(
         output / "smoke/package", output / "smoke", "armv8" if arch == "arm64" else arch
     )

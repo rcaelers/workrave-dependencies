@@ -1,0 +1,11 @@
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -134,6 +134,8 @@
+                                     elif "-lrt" in dependency:
+                                         components[potential_lib_name].setdefault("system_libs", []).append("rt")
+                                 elif self.settings.os == "Windows":
++                                    if dependency == "Threads::Threads" and not is_msvc(self):
++                                        components[potential_lib_name].setdefault("system_libs", []).append("pthread")
+                                     for system_lib in ["bcrypt", "advapi32", "dbghelp"]:
+                                         if system_lib in dependency:
+                                             components[potential_lib_name].setdefault("system_libs", []).append(system_lib)

@@ -1,0 +1,5 @@
+# Present only in gRPC packages built with Workrave's MinGW AF_UNIX patch.
+include(CMakeFindDependencyMacro)
+find_dependency(gRPC @GRPC_VERSION@ EXACT CONFIG)
+set(WORKRAVE_GRPC_MINGW_AF_UNIX TRUE)
+set(WORKRAVE_GRPC_VERSION "@GRPC_VERSION@")

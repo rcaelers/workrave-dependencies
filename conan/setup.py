@@ -17,6 +17,9 @@ OVERLAYS = {
     "qt": ("6.x.x", "6.12.0"),
     "boost": ("all", "1.91.0"),
     "openssl": ("3.x.x", "3.6.5"),
+    "grpc": ("all", "1.84.0"),
+    "abseil": ("all", "20260107.1"),
+    "protobuf": ("all", "6.33.5"),
 }
 
 
@@ -61,6 +64,9 @@ def main():
                 cwd=recipe,
                 check=True,
             )
+            extras = ROOT / "recipes" / name
+            if extras.is_dir():
+                shutil.copytree(extras, recipe, dirs_exist_ok=True)
             subprocess.run(
                 ["conan", "export", str(recipe), f"--version={version}"], check=True
             )

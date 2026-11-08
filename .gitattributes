@@ -4,6 +4,9 @@
 # PKGBUILD files must have LF line endings for MSYS2 compatibility
 PKGBUILD text eol=lf
 
+# Unified diffs retain context markers on blank lines and require stable line endings
+*.patch text eol=lf whitespace=-blank-at-eol
+
 # Shell scripts should have LF line endings
 *.sh text eol=lf
 
