@@ -5,8 +5,8 @@ llvm-mingw, with x64/ARM64 profiles and matching PDB archives. Both profiles
 include static gRPC with MinGW AF_UNIX support. `WorkraveGrpcConfig.cmake`
 provides the capability marker used by Workrave when cross-compiling.
 
-The MSYS2 gRPC patch is now also provided by the Conan recipe overlay.
-xmlsec is no longer required. Their package scripts and workflows will be retired at release cutover.
+The previous MSYS2 gRPC build has moved into the Conan recipe overlay.
+xmlsec is no longer required. Their package scripts and workflows are retired.
 
 See [workrave-build-containers](https://github.com/rcaelers/workrave-build-containers)
 for the MSYS2 GTK and native llvm-mingw/Conan Qt images used by Workrave's

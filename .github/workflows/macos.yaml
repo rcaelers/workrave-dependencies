@@ -1,537 +1,101 @@
-name: Workrave dependencies
-
-permissions:
-  id-token: write
-  attestations: write
-  contents: write # Needed for creating releases
-  actions: read # Needed for downloading artifacts
-
-env:
-  XCODE_VERSION: '26.0.1'
-
-concurrency:
-  group: dependencies-build-${{ github.ref }}
-  cancel-in-progress: true
+name: Conan macOS dependencies
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'macos/**'
-      - '.github/workflows/macos.yaml'
+    branches: [main]
+    paths: ['conan/**', '.github/workflows/macos.yaml']
   pull_request:
-    branches:
-      - main
-    paths:
-      - 'macos/**'
-      - '.github/workflows/macos.yaml'
+    branches: [main]
+    paths: ['conan/**', '.github/workflows/macos.yaml']
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dependencies-macos-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  openssl:
+  build:
     runs-on: macos-26
-    name: build OpenSSL
-
+    env:
+      CONAN_HOME: ${{ github.workspace }}/conan/_build/conan-home-macos
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache OpenSSL build
-        id: cache-openssl
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          path: macos/_deploy/dependencies
-          key: openssl-${{ runner.os }}-${{ hashFiles('macos/build-openssl.sh') }}
+          python-version: '3.13'
+      - name: Install build tools
+        run: |
+          python -m pip install conan==2.34.0
+          brew install cmake ninja pkgconf
+      - name: Test universal merging and relocation
+        run: python -m unittest discover -s conan/tests -p test_macos_sdk.py -v
+      - name: Identify Xcode and SDK for cache reuse
+        id: xcode
+        run: |
+          key=$({ xcodebuild -version; xcrun clang --version; xcrun --show-sdk-version; } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.CONAN_HOME }}
+          key: conan-macos-${{ runner.arch }}-${{ steps.xcode.outputs.key }}-${{ hashFiles('conan/macos.lock', 'conan/conanfile.py', 'conan/setup.py', 'conan/patches/**', 'conan/config/**') }}
           restore-keys: |
-            openssl-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/openssl _build/openssl _deploy/dependencies
-          echo "Cleaned previous OpenSSL build artifacts"
-
-      - name: Build OpenSSL
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-openssl.sh
-
-      - name: Upload OpenSSL artifacts
-        uses: actions/upload-artifact@v4
+            conan-macos-${{ runner.arch }}-${{ steps.xcode.outputs.key }}-
+      - name: Check both locked dependency graphs
+        run: python conan/build.py --platform macos --check
+      - name: Build and validate universal SDK
+        run: python conan/build.py --platform macos --jobs 4
+      - name: Archive SDK with symlinks and executable modes
+        run: tar -czf workrave-dependencies-macos.tar.gz -C conan/_build/macos-universal .
+      - uses: actions/upload-artifact@v4
         with:
-          name: openssl-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
+          name: workrave-dependencies-macos
+          path: workrave-dependencies-macos.tar.gz
+          retention-days: 14
 
-  boost:
-    runs-on: macos-26
-    name: build Boost
-
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache Boost build
-        id: cache-boost
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: macos/_deploy/dependencies
-          key: boost-${{ runner.os }}-${{ hashFiles('macos/build-boost.sh') }}
-          restore-keys: |
-            boost-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-boost.outputs.cache-hit != 'true'
+          name: workrave-dependencies-macos
+      - name: Publish macOS dependency SDK
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cd macos
-          rm -rf _source/boost _build/boost _deploy/dependencies
-          echo "Cleaned previous Boost build artifacts"
-
-      - name: Build Boost
-        if: steps.cache-boost.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-boost.sh
-
-      - name: Upload Boost artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: boost-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  fmt_and_spdlog:
-    runs-on: macos-26
-    name: build Fmt/Spdlog
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache Fmt/Spdlog build
-        id: cache-fmt-spdlog
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: fmt-spdlog-${{ runner.os }}-${{ hashFiles('macos/build-fmt.sh', 'macos/build-spdlog.sh') }}
-          restore-keys: |
-            fmt-spdlog-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/fmt _build/fmt _source/spdlog _build/spdlog _deploy/dependencies
-          echo "Cleaned previous Fmt/Spdlog build artifacts"
-
-      - name: Setup build env
-        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
-        run: |
-          brew install ninja
-          brew outdated cmake || brew upgrade cmake
-
-      - name: Build Fmt
-        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-fmt.sh
-
-      - name: Build Spdlog
-        if: steps.cache-fmt-spdlog.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-spdlog.sh
-
-      - name: Upload Fmt/Spdlog artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: fmt-spdlog-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  gtest:
-    runs-on: macos-26
-    name: build GTest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache GTest build
-        id: cache-gtest
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: gtest-${{ runner.os }}-${{ hashFiles('macos/build-gtest.sh') }}
-          restore-keys: |
-            gtest-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-gtest.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/gtest _build/gtest _deploy/dependencies
-          echo "Cleaned previous GTest build artifacts"
-
-      - name: Setup build env
-        if: steps.cache-gtest.outputs.cache-hit != 'true'
-        run: |
-          brew install ninja
-          brew outdated cmake || brew upgrade cmake
-
-      - name: Build GTest
-        if: steps.cache-gtest.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-gtest.sh
-
-      - name: Upload GTest artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: gtest-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  sqlite3:
-    runs-on: macos-26
-    name: build SQLite
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache SQLite build
-        id: cache-sqlite3
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: sqlite3-${{ runner.os }}-${{ hashFiles('macos/build-sqlite3.sh') }}
-          restore-keys: |
-            sqlite3-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-sqlite3.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/sqlite3 _build/sqlite3 _deploy/dependencies
-          echo "Cleaned previous SQLite build artifacts"
-
-      - name: Build SQLite
-        if: steps.cache-sqlite3.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-sqlite3.sh
-
-      - name: Upload SQLite artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: sqlite3-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  grpc:
-    runs-on: macos-26
-    name: build gRPC/Protobuf
-    needs:
-      - openssl
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache gRPC build
-        id: cache-grpc
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: grpc-${{ runner.os }}-${{ hashFiles('macos/build-grpc.sh', 'macos/build-openssl.sh') }}
-          restore-keys: |
-            grpc-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/grpc _build/grpc _deploy/dependencies _ext/dependencies
-          echo "Cleaned previous gRPC build artifacts"
-
-      - name: Download OpenSSL artifacts
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: openssl-dependencies-macos
-          path: macos/_ext/dependencies/
-
-      - name: Setup build env
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        run: |
-          brew install ninja
-          brew outdated cmake || brew upgrade cmake
-
-      - name: Build gRPC
-        if: steps.cache-grpc.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-grpc.sh
-
-      - name: Upload gRPC artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: grpc-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  qt:
-    runs-on: macos-26
-    name: build Qt
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Update xcode
-        run: sudo xcode-select --switch /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache Qt build
-        id: cache-qt
-        uses: actions/cache@v4
-        with:
-          path: macos/_deploy/dependencies
-          key: qt-${{ runner.os }}-${{ hashFiles('macos/build-qt.sh') }}
-          restore-keys: |
-            qt-${{ runner.os }}-
-
-      - name: Clean previous build
-        if: steps.cache-qt.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          rm -rf _source/qt _build/qt _deploy/dependencies
-          echo "Cleaned previous Qt build artifacts"
-
-      - name: Setup build env
-        if: steps.cache-qt.outputs.cache-hit != 'true'
-        run: |
-          brew install ninja
-          brew outdated cmake || brew upgrade cmake
-
-      - name: Build Qt
-        if: steps.cache-qt.outputs.cache-hit != 'true'
-        run: |
-          cd macos
-          ./build-qt.sh
-
-      - name: Upload Qt artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: qt-dependencies-macos
-          path: macos/_deploy/dependencies/
-          retention-days: 1
-
-  create_release:
-    runs-on: macos-26
-    name: Create GitHub Release
-    needs:
-      - openssl
-      - boost
-      - fmt_and_spdlog
-      - gtest
-      - sqlite3
-      - grpc
-      - qt
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup GitHub CLI
-        run: |
-          brew install gh
-
-      - name: Download OpenSSL artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: openssl-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download Boost artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: boost-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download Fmt/Spdlog artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: fmt-spdlog-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download GTest artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: gtest-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download SQLite artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: sqlite3-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download gRPC artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: grpc-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Download Qt artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: qt-dependencies-macos
-          path: combined-dependencies/
-
-      - name: Check for Homebrew linkage
-        run: |
-          cd macos
-          ./check-no-homebrew-links.sh ../combined-dependencies
-
-      - name: Create archive
-        run: |
-          cd combined-dependencies
-          echo "::group::Creating release archive"
-          tar -czf ../workrave-dependencies-macos.tar.gz .
-          echo "::endgroup::"
-          cd ..
-          echo "Archive created successfully:"
-          ls -la workrave-dependencies-macos.tar.gz
-          echo "Archive contents:"
-          tar -tzf workrave-dependencies-macos.tar.gz | head -20
-
-      - name: Set release info
-        id: release_info
-        run: |
-          # Always use macos-latest tag for macOS builds
-          if [ "${{ github.ref_type }}" == "tag" ]; then
-            echo "target_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "target_name=Workrave macOS Dependencies ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            target_tag="$GITHUB_REF_NAME"
+            title="Workrave macOS Dependencies $GITHUB_REF_NAME"
+            release_options=()
           else
-            echo "target_tag=macos-latest" >> $GITHUB_OUTPUT
-            echo "target_name=Workrave macOS Dependencies (Latest)" >> $GITHUB_OUTPUT
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            target_tag=macos-latest
+            title='Workrave macOS Dependencies (Latest)'
+            release_options=(--prerelease)
+            # Preserve the existing moving-tag and asset-name contract.
+            gh release delete macos-latest --yes || true
+            git push --delete origin macos-latest || true
           fi
+          cat > release-notes.md <<EOF
+          Universal arm64+x86_64 Conan dependency SDK for Workrave, targeting macOS 14.4.
+          Qt is deployed as dylibs. The archive contains a relocatable CMake toolchain,
+          native deployment/code-generation tools, and a package manifest.
 
-          # Generate build date
-          echo "build_date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
-
-      - name: Delete existing macos-latest release
-        if: steps.release_info.outputs.target_tag == 'macos-latest'
-        run: |
-          # Delete the macos-latest release and tag if it exists (for push events only)
-          gh release delete macos-latest --yes || true
-          git push --delete origin macos-latest || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Release
-        run: |
-          echo "::group::Creating release"
-          gh release create ${{ steps.release_info.outputs.target_tag }} \
-            ./workrave-dependencies-macos.tar.gz \
-            --title "${{ steps.release_info.outputs.target_name }}" \
-            --notes "Workrave macOS dependencies built on ${{ steps.release_info.outputs.build_date }}
-
-          This release contains all the dependencies needed for Workrave on macOS:
-          - OpenSSL
-          - Boost
-          - Fmt
-          - Spdlog
-          - GTest
-          - SQLite
-          - Protobuf
-          - gRPC
-          - Qt
-
-          Built with Xcode 16.4 on macOS 15.
-
-          Commit: ${{ github.sha }}
-          ${{ github.ref_type == 'tag' && 'Tag' || 'Branch' }}: ${{ github.ref_name }}" \
-            ${{ steps.release_info.outputs.is_prerelease == 'true' && '--prerelease' || '' }}
-          echo "::endgroup::"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+          Commit: $GITHUB_SHA
+          EOF
+          gh release create "$target_tag" ./workrave-dependencies-macos.tar.gz \
+            --target "$GITHUB_SHA" --title "$title" --notes-file release-notes.md \
+            "${release_options[@]}"
+      - uses: actions/attest-build-provenance@v1
         with:
-          subject-path: ./workrave-dependencies-macos.tar.gz
-
-  cleanup_individual_artifacts:
-    runs-on: macos-26
-    name: Cleanup individual artifacts
-    needs:
-      - create_release
-    if: always()
-
-    steps:
-      - name: Delete OpenSSL artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: openssl-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete Boost artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: boost-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete Fmt/Spdlog artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: fmt-spdlog-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete GTest artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: gtest-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete SQLite artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: sqlite3-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete gRPC artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: grpc-dependencies-macos
-        continue-on-error: true
-
-      - name: Delete Qt artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: qt-dependencies-macos
-        continue-on-error: true
+          subject-path: workrave-dependencies-macos.tar.gz

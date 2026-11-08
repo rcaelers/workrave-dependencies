@@ -3,7 +3,7 @@
 Shared Conan 2 recipes build the dependencies for Workrave's **Qt interface**:
 Windows x64/ARM64 cross-builds on Linux with llvm-mingw, and native macOS builds
 exported as a universal arm64+x86_64 SDK. Use Conan 2.34.0 or newer.
-Conan builds both platform SDKs; legacy builders remain available until release cutover.
+Conan replaces the dedicated macOS and Windows dependency scripts.
 
 ## macOS
 
@@ -132,7 +132,9 @@ python3 -m unittest discover -s conan/tests -p test_macos_sdk.py -v
 
 The integration test compiles real thin libraries/tools, merges and moves the
 SDK, deletes its original Conan cache, then builds and runs a universal CMake
-consumer.
+consumer. The macOS GitHub workflow runs these tests and graph checks on PRs;
+it builds and uploads the complete SDK on PRs. Pushes to `main` and manual
+runs also publish the SDK, using `macos-latest` for branch builds.
 
 To update the macOS graph after changing versions/recipes:
 
@@ -165,7 +167,7 @@ upstream support. Build-host SDK/compiler requirements are separate again.
 | PCRE2 10.42, bzip2 1.0.8, double-conversion 3.4.0, FreeType 2.15.0, libpng 1.6.59, Brotli 1.2.1, HarfBuzz 15.0.0, D-Bus 1.15.8, Expat 2.10.0, libbacktrace cci.20210118, libiconv 1.17 | No requirement above 14.4 found in the pinned Conan recipes or top-level upstream build documentation. A precise supported macOS minimum is unspecified; this is not a guarantee of support for arbitrary older releases. |
 | OpenGL/system | Apple's system framework, not a separately compiled library. |
 
-The legacy macOS scripts also build ICU separately. Conan's Qt profile disables ICU,
+The retired macOS scripts built ICU separately. Conan's Qt profile disables ICU,
 so no standalone ICU build is needed for this SDK.
 This review concerns deployment OS support, not library release lifetimes or
 an upgrade audit. Recheck the upstream matrices when updating dependencies.
