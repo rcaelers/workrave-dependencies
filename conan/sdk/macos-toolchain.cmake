@@ -1,0 +1,10 @@
+# Optional convenience toolchain. find_package also works with just
+# -DCMAKE_PREFIX_PATH=<sdk> and an explicit CMAKE_OSX_ARCHITECTURES.
+get_filename_component(WORKRAVE_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
+list(PREPEND CMAKE_PREFIX_PATH "${WORKRAVE_SDK_DIR}" "${WORKRAVE_SDK_DIR}/generators")
+list(PREPEND CMAKE_MODULE_PATH "${WORKRAVE_SDK_DIR}/generators")
+set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Workrave architectures")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.4" CACHE STRING "Minimum macOS version")
+set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG Release)

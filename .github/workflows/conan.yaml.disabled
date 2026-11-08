@@ -20,11 +20,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build the Linux cross-compiler image
-        run: docker build -t workrave-dependencies:llvm-mingw conan
+      - name: Pull the Linux cross-compiler image
+        run: docker pull ghcr.io/rcaelers/workrave-build:llvm-mingw
       - name: Check symbols and both locked dependency graphs
         run: |
-          docker run --rm -v "$PWD:/work" workrave-dependencies:llvm-mingw \
+          docker run --rm -v "$PWD:/work" ghcr.io/rcaelers/workrave-build:llvm-mingw \
             sh -ec '
               python3 conan/build.py --check
               python3 -m unittest discover -s conan/tests -v

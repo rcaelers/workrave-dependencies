@@ -11,12 +11,12 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-CCI_COMMIT = "07389b8fa043666661da208a0cff039338f6e596"
-CCI_SHA256 = "adb15503f3b3ab4b98a45bc7d77ff01497c738d99ab8db8a2f52f54bb8fff5e9"
+CCI_COMMIT = "08d9ba53fce3cf3d5a9157da1fdecd32371c452a"
+CCI_SHA256 = "4f6296e62a475a022a7c7b60b6fabb3ec1c3c756cd70a12c98ce1e26bb9a7082"
 OVERLAYS = {
-    "qt": ("6.x.x", "6.11.1"),
+    "qt": ("6.x.x", "6.12.0"),
     "boost": ("all", "1.91.0"),
-    "openssl": ("3.x.x", "3.6.4"),
+    "openssl": ("3.x.x", "3.6.5"),
 }
 
 

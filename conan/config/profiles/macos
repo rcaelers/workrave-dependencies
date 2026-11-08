@@ -1,0 +1,61 @@
+include(qt-options)
+
+[settings]
+os=Macos
+os.version=14.4
+compiler=apple-clang
+compiler.version={{ os.getenv("WORKRAVE_APPLE_CLANG", "21") }}
+compiler.libcxx=libc++
+compiler.cppstd=20
+qt/*:compiler.cppstd=23
+build_type=Release
+
+[options]
+&:with_grpc=True
+# Keep native code-generator packages compatible with the target packages
+# on the native slice, avoiding a second static Qt/protobuf build.
+qt/*:shared=True
+qt/*:with_dbus=True
+openssl/*:shared=True
+protobuf/*:shared=True
+grpc/*:shared=True
+# One shared Abseil runtime for protobuf and gRPC, matching BUILD_SHARED_LIBS
+# in the shell build. Static copies across dylibs duplicate synchronization TLS.
+abseil/*:shared=True
+# Keep the prebuilt test framework's STL implementation separate from
+# sanitizer-instrumented consumers (in particular libc++ vector annotations).
+gtest/*:shared=True
+grpc/*:csharp_plugin=False
+grpc/*:node_plugin=False
+grpc/*:objective_c_plugin=False
+grpc/*:php_plugin=False
+grpc/*:python_plugin=False
+grpc/*:ruby_plugin=False
+boost/*:without_mpi=True
+boost/*:without_python=True
+# CCI expects cobalt_io_ssl without declaring/supplying its OpenSSL dependency.
+# Workrave does not use Cobalt; Windows already disables it too.
+boost/*:without_cobalt=True
+boost/*:i18n_backend_icu=False
+boost/*:i18n_backend_iconv=libc
+boost/*:zstd=False
+boost/*:lzma=False
+boost/*:pch=False
+
+[conf]
+# Use the selected Xcode tools, independent of Homebrew's compiler symlinks.
+tools.build:compiler_executables={"c": "/usr/bin/clang", "cpp": "/usr/bin/clang++"}
+tools.build:skip_test=True
+tools.gnu:pkg_config={{ os.getenv("WORKRAVE_PKG_CONFIG", "/opt/homebrew/bin/pkg-config") }}
+qt/*:tools.cmake.cmaketoolchain:extra_variables={"CMAKE_PROJECT_INCLUDE": "{{ os.getenv('CONAN_HOME') }}/workrave/qt-required-modules.cmake"}
+# Qt sets its default before project() loads Conan's toolchain. Pass the
+# requested target on the command line, as the original shell build did.
+qt/*:tools.cmake:configure_args=["-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4", "-DINPUT_libb2=qt", "-DINPUT_tiff=qt", "-DINPUT_webp=qt", "-DCMAKE_IGNORE_PREFIX_PATH='/opt/homebrew;/usr/local'"]
+qt/*:tools.info.package_id:confs=["tools.cmake:configure_args"]
+
+[buildenv]
+CC=/usr/bin/clang
+CXX=/usr/bin/clang++
+# Retain Conan's PKG_CONFIG_PATH, but suppress pkg-config's compiled-in
+# Homebrew defaults. The pkg-config executable itself can come from Homebrew.
+PKG_CONFIG_LIBDIR={{ os.getenv('CONAN_HOME') }}/workrave/no-system-pkgconfig

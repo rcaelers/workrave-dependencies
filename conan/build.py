@@ -118,10 +118,7 @@ def build(arch, jobs, export):
     run("cmake", "--build", output / "smoke", "--parallel", jobs)
     probe = output / "smoke/package"
     run("cmake", "--install", output / "smoke", "--prefix", probe)
-    symbol_helper().retain_symbols(
-        probe, output / "smoke", "armv8" if arch == "arm64" else arch
-    )
-    export_symbols(graph, output, arch)
+    validate(arch)
     # Keep the toolchain's runtime DLLs with the SDK. Upstream does not ship PDBs
     # for these; see README. Do not mix in MSYS2 or GCC MinGW runtime libraries.
     target = "aarch64" if arch == "arm64" else "x86_64"
@@ -155,6 +152,18 @@ def build(arch, jobs, export):
     print(f"Built and checked Windows {arch}: {output}")
 
 
+def validate(arch):
+    """Validate the existing smoke build and all resolved package binaries/PDBs."""
+    output = ROOT / "_build" / f"windows-{arch}"
+    if not (output / "smoke/package/bin/dependencies-smoke.exe").is_file():
+        raise RuntimeError("Missing Qt smoke build; compile and install it before validation")
+    symbol_helper().retain_symbols(
+        output / "smoke/package", output / "smoke", "armv8" if arch == "arm64" else arch
+    )
+    export_symbols(output / "graph.json", output, arch)
+    print(f"Validated Windows {arch} smoke build and dependency symbols")
+
+
 def check_graph(arch):
     output = ROOT / "_build" / f"windows-{arch}" / "graph-check.json"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -185,6 +194,10 @@ def check_graph(arch):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--platform", choices=("windows", "macos"),
+                        default="macos" if sys.platform == "darwin" else "windows")
+    parser.add_argument("--sdk-output", type=Path, default=ROOT / "_build/macos-universal",
+                        help="Destination for the universal macOS SDK (must not exist)")
     parser.add_argument("--arch", choices=("x86_64", "arm64", "all"), default="all")
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 8))
     mode = parser.add_mutually_exclusive_group()
@@ -198,6 +211,11 @@ def main():
         action="store_true",
         help="Validate locked graphs without building packages",
     )
+    mode.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate an existing Windows build/PDBs or exported macOS SDK",
+    )
     parser.add_argument(
         "--export-cache",
         action="store_true",
@@ -206,8 +224,16 @@ def main():
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.platform == "macos":
+        from build_macos import main as macos_main
+        macos_main(args, parser)
+        return
     if sys.platform != "linux" or not shutil.which("x86_64-w64-mingw32-clang"):
         parser.error("Run this command in the llvm-mingw build image")
+    if args.validate:
+        for arch in ("x86_64", "arm64") if args.arch == "all" else (args.arch,):
+            validate(arch)
+        return
     run(sys.executable, ROOT / "setup.py")
     if args.update_lock:
         # A lock contains references, not architecture settings. Extend the x64

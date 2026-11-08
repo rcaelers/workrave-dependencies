@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.24)
+project(windeployqt LANGUAGES CXX)
+find_package(Qt6 REQUIRED COMPONENTS Core Network)
+add_executable(windeployqt main.cpp qmlutils.cpp qtmoduleinfo.cpp qtplugininfo.cpp utils.cpp peheaderinfo.cpp)
+target_compile_features(windeployqt PRIVATE cxx_std_20)
+target_compile_definitions(windeployqt PRIVATE QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_FOREACH QT_NO_QPAIR QT_NO_URL_CAST_FROM_STRING)
+target_link_libraries(windeployqt PRIVATE Qt6::CorePrivate Qt6::Network shlwapi)
+install(TARGETS windeployqt RUNTIME DESTINATION packages/qt/bin)

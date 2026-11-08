@@ -1,0 +1,4 @@
+include(macos)
+
+[settings]
+arch=x86_64

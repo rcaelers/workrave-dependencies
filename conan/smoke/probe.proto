@@ -1,0 +1,4 @@
+syntax = "proto3";
+package workrave.dependencies;
+message Probe { string text = 1; }
+service DependencyProbe { rpc Echo(Probe) returns (Probe); }
