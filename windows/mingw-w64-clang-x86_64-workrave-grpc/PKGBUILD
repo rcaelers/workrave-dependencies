@@ -1,0 +1,128 @@
+# Maintainer: Rob Caelers <rob dot caelers at gmail dot com>
+
+# C++ build adapted from MSYS2 grpc 1.85.0-3:
+# https://github.com/msys2/MINGW-packages/tree/f90165f34bf6c68090d3c3e779b5d28372ae1050/mingw-w64-grpc
+_realname=workrave-grpc
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=1.85.0
+pkgrel=1
+_grpc_proto_commit=dd549fc4ed04b60b0fdd3866b82ef0a7c87c6e4f
+pkgdesc="Static gRPC with MinGW AF_UNIX support for Workrave"
+arch=('any')
+mingw_arch=('clang64')
+url="https://grpc.io/"
+license=('spdx:Apache-2.0')
+depends=("${MINGW_PACKAGE_PREFIX}-cc-libs"
+         "${MINGW_PACKAGE_PREFIX}-abseil-cpp"
+         "${MINGW_PACKAGE_PREFIX}-c-ares"
+         "${MINGW_PACKAGE_PREFIX}-openssl"
+         "${MINGW_PACKAGE_PREFIX}-protobuf"
+         "${MINGW_PACKAGE_PREFIX}-re2"
+         "${MINGW_PACKAGE_PREFIX}-zlib")
+makedepends=("patch"
+             "${MINGW_PACKAGE_PREFIX}-cc"
+             "${MINGW_PACKAGE_PREFIX}-cmake"
+             "${MINGW_PACKAGE_PREFIX}-ninja"
+             "${MINGW_PACKAGE_PREFIX}-pkgconf")
+provides=("${MINGW_PACKAGE_PREFIX}-grpc=${pkgver}")
+conflicts=("${MINGW_PACKAGE_PREFIX}-grpc")
+options=('staticlibs')
+source=("grpc-${pkgver}.tar.gz::https://github.com/grpc/grpc/archive/v${pkgver}/grpc-${pkgver}.tar.gz"
+        "grpc-proto-${_grpc_proto_commit}.tar.gz::https://github.com/grpc/grpc-proto/archive/${_grpc_proto_commit}.tar.gz"
+        "001-fix-thread_local.patch"
+        "003-fix-build-shared-libs-on-mingw.patch"
+        "004-fix-build-with-clang-23.patch"
+        "enable-mingw-af-unix.cmake"
+        "WorkraveGrpcConfig.cmake")
+noextract=("grpc-${pkgver}.tar.gz")
+sha256sums=('78d933f81e66d88c9f7a5ac419aa929691ef62b61d32a92f69c16aabf21ffabe'
+            '6aaa807572edfe307eaddc15161ce684d02d054e3fca36b38993efc85575ddfa'
+            '6695fd531478be73e9555c28d4a1242eb47b9e8c24ccf8df1b8243d81e11c8b1'
+            '3b0de744d3ff858e0a62795f7d6b05b0058cd9ff9c55b34713fa42184dccc6ce'
+            '72aa322fdff5fe0c6c966a7a63d3355aee47167af30cace0f8cd25fcafb0563f'
+            '12acab188e1b1a0674ea9d11188a6a31ff25a8b88067c0fcd429ab7d358556a0'
+            'dff08b7a0adedae80c2f2579ac93af52dee3f5a5d97370984da75b7af06079a9')
+
+prepare() {
+  # MSYS2's default winsymlinks:deepcopy mode cannot extract a symlink before
+  # its target. These seven links precede their targets in GitHub's archive and
+  # are used only by the disabled gRPC test suite. Extract everything else
+  # without requiring Developer Mode or native-symlink privileges.
+  bsdtar -xf "${srcdir}/grpc-${pkgver}.tar.gz" -C "${srcdir}" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls/ab06acdd.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls/b9322cac.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls_missing_intermediate/ab06acdd.r0" \
+    --exclude "grpc-${pkgver}/test/core/tsi/test_creds/crl_data/crls_missing_root/b9322cac.r0" \
+    --exclude "grpc-${pkgver}/test/core/util/http_client/python_wrapper.sh" \
+    --exclude "grpc-${pkgver}/test/distrib/bazel/cpp/tools/bazel" \
+    --exclude "grpc-${pkgver}/test/distrib/bazel/python/tools/bazel"
+
+  # gRPC's archive omits the grpc-proto submodule, as in the MSYS2 recipe.
+  cp -a "${srcdir}/grpc-proto-${_grpc_proto_commit}/." \
+    "${srcdir}/grpc-${pkgver}/third_party/grpc-proto/"
+
+  # Reuse MSYS2's C++ patches; the Python-only patches are not needed here.
+  local patch_file
+  for patch_file in 001-fix-thread_local.patch 003-fix-build-shared-libs-on-mingw.patch 004-fix-build-with-clang-23.patch; do
+    patch --batch --fuzz=0 -p1 -d "${srcdir}/grpc-${pkgver}" -i "${srcdir}/${patch_file}"
+  done
+
+  cmake \
+    -DGRPC_SOURCE_DIR="${srcdir}/grpc-${pkgver}" \
+    -P "${srcdir}/enable-mingw-af-unix.cmake"
+}
+
+build() {
+  declare -a extra_config
+  if check_option "debug" "y"; then
+    extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
+  else
+    extra_config+=("-DCMAKE_BUILD_TYPE=Release")
+  fi
+
+  # This MSYS2 compatibility define prevents strsafe.h from using declarations
+  # deprecated by libc++, while removing the ANSI stdio override avoids broken
+  # PRI* formatting in gRPC log calls.
+  CXXFLAGS="${CXXFLAGS//-Wp,-D__USE_MINGW_ANSI_STDIO=1/}"
+  CXXFLAGS+=" -DSTRSAFE_NO_DEPRECATE -Wno-deprecated-declarations -Wno-unknown-attributes"
+
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+  "${MINGW_PREFIX}/bin/cmake.exe" \
+    -Wno-author \
+    -S "${srcdir}/grpc-${pkgver}" -B "${srcdir}/build-${MSYSTEM}" -G Ninja \
+    -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_SKIP_RPATH=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DgRPC_INSTALL=ON \
+    -DgRPC_BUILD_TESTS=OFF \
+    -DgRPC_BUILD_CODEGEN=ON \
+    -DgRPC_DOWNLOAD_ARCHIVES=OFF \
+    -DgRPC_BUILD_GRPCPP_OTEL_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_CPP_PLUGIN=ON \
+    -DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_PHP_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF \
+    -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF \
+    -DgRPC_ABSL_PROVIDER=package \
+    -DgRPC_CARES_PROVIDER=package \
+    -DgRPC_PROTOBUF_PROVIDER=package \
+    -DgRPC_RE2_PROVIDER=package \
+    -DgRPC_SSL_PROVIDER=package \
+    -DgRPC_ZLIB_PROVIDER=package \
+    "${extra_config[@]}"
+
+  "${MINGW_PREFIX}/bin/cmake.exe" --build "${srcdir}/build-${MSYSTEM}"
+}
+
+package() {
+  DESTDIR="${pkgdir}" "${MINGW_PREFIX}/bin/cmake.exe" --install "${srcdir}/build-${MSYSTEM}"
+
+  install -Dm644 "${srcdir}/WorkraveGrpcConfig.cmake" \
+    "${pkgdir}${MINGW_PREFIX}/lib/cmake/WorkraveGrpc/WorkraveGrpcConfig.cmake"
+  install -Dm644 "${srcdir}/grpc-${pkgver}/LICENSE" \
+    "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}

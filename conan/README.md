@@ -3,7 +3,6 @@
 Shared Conan 2 recipes build the dependencies for Workrave's **Qt interface**:
 Windows x64/ARM64 cross-builds on Linux with llvm-mingw, and native macOS builds
 exported as a universal arm64+x86_64 SDK. Use Conan 2.34.0 or newer.
-Conan replaces the dedicated macOS and Windows dependency scripts.
 
 ## macOS
 
