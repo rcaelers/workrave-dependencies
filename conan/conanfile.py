@@ -79,7 +79,9 @@ class WorkraveDependencies(ConanFile):
             qt_host = Path(self.dependencies.direct_build["qt"].package_folder)
             toolchain.variables["QT_HOST_PATH"] = qt_host.as_posix()
             # Import native tools before the target packages' CMake helpers.
-            contents = 'include("' + (
+            # The toolchain runs before find_package(Qt6) initializes this.
+            # Without it the imports are named ::moc rather than Qt6::moc.
+            contents = 'set(QT_CMAKE_EXPORT_NAMESPACE Qt6)\ninclude("' + (
                 qt_host / "lib/cmake/Qt6Core/conan_qt_executables_variables.cmake"
             ).as_posix() + '")\n'
         if self.options.get_safe("with_grpc", False):

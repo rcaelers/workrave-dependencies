@@ -1,9 +1,15 @@
 --- a/conanfile.py
 +++ b/conanfile.py
-@@ -813,6 +813,13 @@
+@@ -813,6 +813,19 @@
          return None
  
      def build(self):
++        if self.version == "6.12.0":
++            source = os.path.join(self.source_folder, "qttools", "src", "assistant", "qlitehtml",
++                                  "src", "3rdparty", "litehtml", "src", "el_font.cpp")
++            with open(source, encoding="utf-8") as stream:
++                if "#include <cstdlib>" not in stream.read():
++                    replace_in_file(self, source, '#include "el_font.h"', '#include "el_font.h"\n#include <cstdlib>', strict=True)
 +        if self.version == "6.11.1":
 +            header = os.path.join(self.source_folder, "qttools", "src", "linguist", "shared", "releasehelper.h")
 +            with open(header, encoding="utf-8") as source:
@@ -14,7 +20,7 @@
          if self.settings.os == "Macos":
              save(self, ".qmake.stash", "")
              save(self, ".qmake.super", "")
-@@ -890,7 +897,8 @@
+@@ -890,7 +903,8 @@
              targets.append("uic")
          if self.settings_build.os == "Macos" and self.settings.os != "iOS":
              targets.extend(["macdeployqt"])
@@ -24,7 +30,7 @@
              targets.extend(["windeployqt"])
          if Version(self.version) >= "6.11.0":
              targets.extend(["wasmdeployqt"])
-@@ -920,6 +928,13 @@
+@@ -920,6 +934,13 @@
              targets.append("repc")
          if self.options.get_safe("qtscxml"):
              targets.append("qscxmlc")
@@ -38,7 +44,7 @@
          for target in targets:
              exe_path = None
              for path_ in [f"bin/{target}{extension}",
-@@ -936,6 +951,9 @@
+@@ -936,6 +957,9 @@
                  if(NOT TARGET ${{QT_CMAKE_EXPORT_NAMESPACE}}::{target})
                      add_executable(${{QT_CMAKE_EXPORT_NAMESPACE}}::{target} IMPORTED)
                      set_target_properties(${{QT_CMAKE_EXPORT_NAMESPACE}}::{target} PROPERTIES IMPORTED_LOCATION ${{CMAKE_CURRENT_LIST_DIR}}/../../../{exe_path})
@@ -48,7 +54,7 @@
                  endif()
                  """)
  
-@@ -1524,7 +1542,8 @@
+@@ -1524,7 +1548,8 @@
                  self.cpp_info.components["qtEntryPointImplementation"].libs = [f"Qt6EntryPoint{libsuffix}"]
                  self.cpp_info.components["qtEntryPointImplementation"].system_libs = ["shell32"]
  
@@ -58,7 +64,7 @@
                      self.cpp_info.components["qtEntryPointMinGW32"].set_property("cmake_target_name", "Qt6::EntryPointMinGW32")
                      self.cpp_info.components["qtEntryPointMinGW32"].set_property("cmake_target_aliases", ["Qt::EntryPointMinGW32"])
                      self.cpp_info.components["qtEntryPointMinGW32"].system_libs = ["mingw32"]
-@@ -1533,7 +1552,8 @@
+@@ -1533,7 +1558,8 @@
              self.cpp_info.components["qtEntryPointPrivate"].set_property("cmake_target_name", "Qt6::EntryPointPrivate")
              self.cpp_info.components["qtEntryPointPrivate"].set_property("cmake_target_aliases", ["Qt::EntryPointPrivate"])
              if self.settings.os == "Windows":
