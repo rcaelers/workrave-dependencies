@@ -15,32 +15,49 @@ cached separately on Linux.
 
 ## Patched gRPC for CLANG64
 
-`build-grpc.sh` creates a pacman package containing static gRPC 1.85.0 with
-MinGW AF_UNIX support. It uses Abseil, Protobuf, c-ares, RE2, OpenSSL, and zlib
-from the MSYS2 CLANG64 repository.
+`build-grpc.sh` builds the complete [MSYS2 gRPC 1.85.0-4 recipe](https://github.com/msys2/MINGW-packages/tree/19bc2e031e82780357983bf8f28b1fdf7615496e/mingw-w64-grpc)
+for CLANG64, including shared libraries, Python bindings and Python code
+creation tools. All six upstream patches, dependencies and build options are
+preserved. The only local additions enable MinGW AF_UNIX sockets and install
+`WorkraveGrpcConfig.cmake` to advertise that capability.
 
-The C++ build follows the [MSYS2 gRPC 1.85.0-3 recipe](https://github.com/msys2/MINGW-packages/tree/f90165f34bf6c68090d3c3e779b5d28372ae1050/mingw-w64-grpc),
-including its pinned `grpc-proto` sources and C++ patches for thread-local
-storage, MinGW library linkage, and Clang 23. This Workrave variant builds
-static libraries and the C++ code-generation plugin, adds AF_UNIX support and
-the capability config, and omits the Python packages.
+The resulting pacman packages retain the upstream names:
 
-From an MSYS2 CLANG64 shell with the build dependencies installed:
+- `mingw-w64-clang-x86_64-grpc`
+- `mingw-w64-clang-x86_64-python-grpcio`
+- `mingw-w64-clang-x86_64-python-grpcio-tools`
+
+The release filenames have a `workrave-` prefix to distinguish these socket-enabled
+builds. They replace the corresponding MSYS2 packages. When migrating from the
+older static `mingw-w64-clang-x86_64-workrave-grpc` package, remove that package
+before installing these packages to avoid file conflicts.
+
+From an MSYS2 CLANG64 shell with the upstream build dependencies installed:
 
 ```sh
 bash windows/build-grpc.sh
-pacman -U windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
+pacman -U windows/_deploy/*.pkg.tar.zst
 ```
 
-Changes to the build script, package recipe, or workflow publish the same
-package as the `windows-grpc-latest` GitHub release asset. Workrave detects the
-package through `WorkraveGrpcConfig.cmake`. When cross-compiling, its capability
-marker supplies the Unix-domain-socket guarantee that cannot be tested by
-running a configure-time probe.
+The workflow installs all three finished packages, links a C++ consumer, tests
+C++ and Python Unix socket connections, and exercises the Python code generator
+before publishing the packages as the `windows-grpc-latest` release assets.
 
-Install the published package from an MSYS2 CLANG64 shell with:
+Install the published packages from an MSYS2 CLANG64 shell with:
 
 ```sh
-curl -fLO https://github.com/rcaelers/workrave-dependencies/releases/download/windows-grpc-latest/workrave-grpc-mingw-clang64.pkg.tar.zst
-pacman -U workrave-grpc-mingw-clang64.pkg.tar.zst
+for package in grpc python-grpcio python-grpcio-tools; do
+  curl -fLO "https://github.com/rcaelers/workrave-dependencies/releases/download/windows-grpc-latest/workrave-${package}-mingw-clang64.pkg.tar.zst"
+done
+pacman -U workrave-*-mingw-clang64.pkg.tar.zst
 ```
+
+Reconfigure Workrave in a fresh build directory after switching from static to
+shared gRPC so its cached library paths are not reused. Keep the CLANG64 `bin`
+directory on `PATH` when running consumers of the shared libraries. As with
+upstream MSYS2 packages, incompatible dependency upgrades require a rebuild;
+the socket patch does not provide additional OpenSSL compatibility.
+
+Workrave finds the package through `WorkraveGrpcConfig.cmake`. Native builds
+verify Unix socket support by running a listener probe. Cross builds use the
+capability marker because they cannot run the Windows executable.

@@ -15,6 +15,8 @@ on:
       - main
     paths:
       - "windows/build-grpc.sh"
+      - "windows/smoke/**"
+      - "conan/smoke/grpc-af-unix.cpp"
       - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows-grpc.yaml"
       - ".gitattributes"
@@ -23,6 +25,8 @@ on:
       - main
     paths:
       - "windows/build-grpc.sh"
+      - "windows/smoke/**"
+      - "conan/smoke/grpc-af-unix.cpp"
       - "windows/mingw-w64-clang-x86_64-workrave-grpc/**"
       - ".github/workflows/windows-grpc.yaml"
       - ".gitattributes"
@@ -31,7 +35,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    name: Build patched gRPC 1.85.0 package
+    name: Build patched gRPC 1.85.0 and Python packages
 
     defaults:
       run:
@@ -61,22 +65,36 @@ jobs:
             mingw-w64-clang-x86_64-protobuf
             mingw-w64-clang-x86_64-re2
             mingw-w64-clang-x86_64-zlib
+            mingw-w64-clang-x86_64-cython
+            mingw-w64-clang-x86_64-python-build
+            mingw-w64-clang-x86_64-python-installer
+            mingw-w64-clang-x86_64-python-setuptools
+            mingw-w64-clang-x86_64-python-protobuf
+            mingw-w64-clang-x86_64-python-typing_extensions
 
       - name: Build gRPC package
         run: bash windows/build-grpc.sh
+
+      - name: Verify installed gRPC package and Unix socket connection
+        run: |
+          pacman -U --noconfirm windows/_deploy/*.pkg.tar.zst
+          cmake -S windows/smoke -B windows/_build/smoke -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build windows/_build/smoke
+          ctest --test-dir windows/_build/smoke --output-on-failure
+          python windows/smoke/python-grpc.py
 
       - name: Upload gRPC package artifact
         uses: actions/upload-artifact@v4
         with:
           name: workrave-grpc-mingw-clang64
-          path: windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
+          path: windows/_deploy/*.pkg.tar.zst
           retention-days: 14
 
       - name: Generate artifact attestation
         if: github.event_name == 'push'
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: windows/_deploy/workrave-grpc-mingw-clang64.pkg.tar.zst
+          subject-path: windows/_deploy/*.pkg.tar.zst
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -100,10 +118,10 @@ jobs:
           gh release delete windows-grpc-latest --yes || true
           git push --delete origin windows-grpc-latest || true
           gh release create windows-grpc-latest \
-            ./workrave-grpc-mingw-clang64.pkg.tar.zst \
+            ./*.pkg.tar.zst \
             --target "${{ github.sha }}" \
             --title "Workrave gRPC 1.85.0 for MinGW CLANG64" \
-            --notes "Static gRPC 1.85.0 with MinGW AF_UNIX support, built against MSYS2 package dependencies.\n\nCommit: ${{ github.sha }}" \
+            --notes "MSYS2 gRPC 1.85.0 shared libraries, python-grpcio and python-grpcio-tools, with MinGW AF_UNIX support. Commit: ${{ github.sha }}" \
             --prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
