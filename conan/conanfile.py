@@ -34,9 +34,13 @@ class WorkraveDependencies(ConanFile):
         self.requires("gtest/1.18.0")
         self.requires("zlib/1.3.2")  # Crashpad links zlib directly.
         self.requires("libxml2/2.15.4")  # Unfold parses XML appcasts.
+        # Unfold's Sigstore verifier needs these even when Workrave's gRPC
+        # interface is disabled. Keep them in the application's SDK graph.
+        # Select one August LTS for all target libraries in this SDK.
+        self.requires("abseil/20260817.0")
+        self.requires("protobuf/6.33.5")
         if self.options.with_grpc:
             self.requires("grpc/1.84.0")
-            self.requires("protobuf/6.33.5")
 
     def layout(self):
         cmake_layout(self)
@@ -44,9 +48,9 @@ class WorkraveDependencies(ConanFile):
     def build_requirements(self):
         if cross_building(self):
             self.tool_requires("qt/6.12.0")
+            self.tool_requires("protobuf/6.33.5")
             if self.options.with_grpc:
                 self.tool_requires("grpc/1.84.0")
-                self.tool_requires("protobuf/6.33.5")
 
     def generate(self):
         CMakeDeps(self).generate()
@@ -84,33 +88,36 @@ class WorkraveDependencies(ConanFile):
             contents = 'set(QT_CMAKE_EXPORT_NAMESPACE Qt6)\ninclude("' + (
                 qt_host / "lib/cmake/Qt6Core/conan_qt_executables_variables.cmake"
             ).as_posix() + '")\n'
-        if self.options.get_safe("with_grpc", False):
-            libraries = []
+        libraries = []
+        if self.settings_build.os == "Macos":
+            for collection in (self.dependencies.build, self.dependencies.host):
+                for _, dependency in collection.items():
+                    if (dependency.settings.get_safe("os") == "Macos" and
+                            dependency.settings.get_safe("arch", self.settings_build.arch) == self.settings_build.arch):
+                        libraries.extend(dependency.cpp_info.libdirs)
+        tools = [("protobuf", "protoc", "protobuf::protoc")]
+        if self.options.with_grpc:
+            tools.append(("grpc", "grpc_cpp_plugin", "gRPC::grpc_cpp_plugin"))
+        for package, name, target in tools:
+            dependencies = self.dependencies.direct_build if cross_building(self) else self.dependencies.host
+            executable = Path(dependencies[package].package_folder) / "bin" / name
             if self.settings_build.os == "Macos":
-                for collection in (self.dependencies.build, self.dependencies.host):
-                    for _, dependency in collection.items():
-                        if (dependency.settings.get_safe("os") == "Macos" and
-                                dependency.settings.get_safe("arch", self.settings_build.arch) == self.settings_build.arch):
-                            libraries.extend(dependency.cpp_info.libdirs)
-            for package, name, target in (("protobuf", "protoc", "protobuf::protoc"),
-                                          ("grpc", "grpc_cpp_plugin", "gRPC::grpc_cpp_plugin")):
-                dependencies = self.dependencies.direct_build if cross_building(self) else self.dependencies.host
-                executable = Path(dependencies[package].package_folder) / "bin" / name
-                if self.settings_build.os == "Macos":
-                    # /bin/sh strips inherited DYLD_* under SIP. Set the
-                    # native package environment *after* that protected shell
-                    # starts, before exec'ing protoc or its plugin. The SDK
-                    # export fixes rpaths instead and needs no such wrappers.
-                    wrapper = generators / f"workrave-{name}"
-                    wrapper.write_text('#!/bin/sh\nexport DYLD_LIBRARY_PATH=' +
-                                       shlex.quote(":".join(dict.fromkeys(libraries))) + '\nexec ' +
-                                       shlex.quote(str(executable)) + ' "$@"\n')
-                    wrapper.chmod(0o755)
-                    executable = wrapper
-                contents += (f'if(NOT TARGET {target})\n'
-                             f'  add_executable({target} IMPORTED)\n'
-                             f'  set_property(TARGET {target} PROPERTY IMPORTED_LOCATION "{executable.as_posix()}")\n'
-                             'endif()\n')
+                # /bin/sh strips inherited DYLD_* under SIP. Set the
+                # native package environment *after* that protected shell
+                # starts, before exec'ing protoc or its plugin. The SDK
+                # export fixes rpaths instead and needs no such wrappers.
+                wrapper = generators / f"workrave-{name}"
+                wrapper.write_text('#!/bin/sh\nexport DYLD_LIBRARY_PATH=' +
+                                   shlex.quote(":".join(dict.fromkeys(libraries))) + '\nexec ' +
+                                   shlex.quote(str(executable)) + ' "$@"\n')
+                wrapper.chmod(0o755)
+                executable = wrapper
+            if package == "protobuf":
+                toolchain.variables["Protobuf_PROTOC_EXECUTABLE"] = executable.as_posix()
+            contents += (f'if(NOT TARGET {target})\n'
+                         f'  add_executable({target} IMPORTED)\n'
+                         f'  set_property(TARGET {target} PROPERTY IMPORTED_LOCATION "{executable.as_posix()}")\n'
+                         'endif()\n')
         if contents:
             native_tools = generators / "workrave-host-tools.cmake"
             native_tools.write_text(contents)

@@ -4,6 +4,11 @@ Shared Conan 2 recipes build the dependencies for Workrave's **Qt interface**:
 Windows x64/ARM64 cross-builds on Linux with llvm-mingw, and native macOS builds
 exported as a universal arm64+x86_64 SDK. Use Conan 2.34.0 or newer.
 
+Abseil and Protobuf are required by Unfold's Sigstore verifier and are included
+even with `with_grpc=False`. Cross builds also resolve a matching host-native
+Protobuf package. The generated toolchain selects its `protoc` through
+`Protobuf_PROTOC_EXECUTABLE`, independently of the optional gRPC code generator.
+
 ## macOS
 
 Install Conan, CMake, Ninja and pkg-config, and select the Xcode installation to
@@ -156,7 +161,7 @@ upstream support. Build-host SDK/compiler requirements are separate again.
 | Dependency in the Conan SDK | Upstream macOS support finding |
 | --- | --- |
 | Qt 6.12.0 | **14.4+**, Intel and Apple Silicon; Xcode 16 / macOS 15 SDK or newer for building. [Qt 6.12 platform matrix](https://doc.qt.io/qt-6.12/supported-platforms.html). |
-| GoogleTest 1.18.0, Abseil 20260107.1 | Follow Google's current support policy: **13+ target**, Xcode 27 / Apple Clang 21 build toolchain. This is the current policy, not a historical hard minimum for every release. [GoogleTest](https://google.github.io/googletest/platforms.html), [Abseil](https://abseil.io/about/compatibility), [support matrix](https://github.com/google/oss-policies-info/blob/main/foundational-cxx-support-matrix.md). |
+| GoogleTest 1.18.0, Abseil 20260817.0 | Follow Google's current support policy: **13+ target**, Xcode 27 / Apple Clang 21 build toolchain. This is the current policy, not a historical hard minimum for every release. [GoogleTest](https://google.github.io/googletest/platforms.html), [Abseil](https://abseil.io/about/compatibility), [support matrix](https://github.com/google/oss-policies-info/blob/main/foundational-cxx-support-matrix.md). |
 | gRPC 1.84.0, Protobuf 6.33.5, RE2 20251105 | No separate numeric macOS floor found in the pinned source build documentation/recipes; their Abseil dependency brings the policy above. [gRPC build documentation](https://github.com/grpc/grpc/blob/master/BUILDING.md). |
 | OpenSSL 3.6.5 | Upstream primary-platform table includes macOS **11** on Intel and Apple Silicon; this is a tested platform, not an explicit oldest-runtime guarantee. [OpenSSL platforms](https://mirror.openssl-library.org/policies/general-supplemental/platforms/). |
 | Boost 1.91.0 | No single numeric macOS floor published across all libraries; requirements vary by library and compiler. [Release documentation](https://www.boost.org/releases/1.91.0/). |
@@ -266,7 +271,12 @@ pinned ConanCenter snapshot and applies small patches for the exceptions:
 * **Boost:** select B2's GNU driver/linker rules for Windows Clang without an
   MSVC runtime. This also produces the required MinGW import libraries.
 * **OpenSSL 3:** recognize llvm-mingw and select `mingw64` or `mingwarm64`.
-* **Abseil:** preserve the pthread link dependency in MinGW component metadata.
+* **Abseil:** preserve the pthread link dependency in MinGW component metadata
+  and backport upstream [ddbdebc](https://github.com/abseil/abseil-cpp/commit/ddbdebc6c8fd305597fe03a0fc00411cf09801b0)
+  to define unavailable `O_NONBLOCK` as zero on Windows.
+* **Protobuf and RE2:** extend the recipes' Abseil upper bounds to the August
+  2026 LTS. This applies to target libraries and native code generators; the
+  SDK pins one Abseil version rather than forcing conflicting requirements.
 * **Protobuf/UPB:** backport [protobuf #24897](https://github.com/protocolbuffers/protobuf/pull/24897)
   to keep Windows ARM64 inline assembly compatible with SEH unwind generation.
   The same fix is applied to gRPC's bundled UPB.
@@ -301,6 +311,40 @@ revision. Update `settings_user.yml` and the profiles when changing LLVM majors.
 The `user.workrave:toolchain` configuration participates in target package IDs;
 bump it when changing the compiler distribution, compatibility fixes or symbol
 policy so old cached packages cannot silently bypass those changes.
+
+## Dependency review (2026-11-22)
+
+This change upgrades Abseil from 20260107.1 to 20260817.0. The remaining direct
+pins stay unchanged; newer upstream releases below are follow-up candidates,
+not versions silently substituted into this SDK.
+
+| Dependency | SDK pin | Upstream stable | Review |
+| --- | --- | --- | --- |
+| [Abseil](https://github.com/abseil/abseil-cpp/releases) | **20260817.0** | 20260817.0 | Upgraded; includes the upstream MinGW flag backport. |
+| [Qt](https://download.qt.io/official_releases/qt/6.12/) | 6.12.0 | 6.12.0 | Current release in the selected series. |
+| [Boost](https://github.com/boostorg/boost/releases) | 1.91.0 | 1.92.0 | Newer than the reviewed Conan Center recipe; 1.93 beta excluded. |
+| [fmt](https://github.com/fmtlib/fmt/releases) | 12.2.0 | 12.2.1 | Newer than the reviewed Conan Center recipe. |
+| [spdlog](https://github.com/gabime/spdlog/releases) | 1.17.0 | 1.17.0 | Current. |
+| [GoogleTest](https://github.com/google/googletest/releases) | 1.18.0 | 1.18.0 | Current. |
+| [SQLite](https://sqlite.org/changes.html) | 3.54.1 | 3.54.1 | Current. |
+| [libxml2](https://download.gnome.org/sources/libxml2/2.15/) | 2.15.4 | 2.15.4 | Current. |
+| [zlib](https://github.com/madler/zlib/releases) | 1.3.2 | 1.4 | New recipe available; needs a separate SDK rebuild and runtime check. |
+| [gRPC](https://github.com/grpc/grpc/releases) | 1.84.0 | 1.85.0 | Conan Center still supplies 1.84.0. Upstream also released 1.84.4 maintenance. Standalone MSYS2 package already uses 1.85.0. |
+| [Protobuf](https://github.com/protocolbuffers/protobuf/releases) | 6.33.5 (protoc 33.5) | 7.36.2 (protoc 36.2) | gRPC's recipe requires Protobuf below 7; retain matched native protoc. |
+| [OpenSSL](https://github.com/openssl/openssl/releases) | 3.6.5 | 4.1.0 | Keep the supported 3.x pin: gRPC's recipe requires OpenSSL below 4. |
+
+Recipe availability was checked against Conan Center commit
+`61a335b1506d7fab97beda6cf196b522f58c93ae`; this does not change the pinned
+recipe snapshot used by `setup.py`.
+
+Validation for this upgrade: Abseil shared libraries, Protobuf 6.33.5 with native
+protoc, RE2 20251105 and gRPC 1.84.0 were built with C++20 on native macOS ARM64.
+Generated C++ bindings completed an in-process RPC round trip. Fresh Windows
+x86-64 and ARM64 dependency graphs resolved with the new recipes. Seven repo
+tests passed, including the universal SDK relocation test; six Windows compiler
+checks were skipped locally. This is not a full Windows or universal macOS SDK
+rebuild. The existing unrelated lock revisions were preserved; only Abseil,
+Protobuf and RE2 references were replaced with Conan-exported revisions.
 
 ## Debug symbols
 

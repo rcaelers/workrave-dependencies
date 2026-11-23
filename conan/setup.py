@@ -18,8 +18,9 @@ OVERLAYS = {
     "boost": ("all", "1.91.0"),
     "openssl": ("3.x.x", "3.6.5"),
     "grpc": ("all", "1.84.0"),
-    "abseil": ("all", "20260107.1"),
+    "abseil": ("all", "20260817.0"),
     "protobuf": ("all", "6.33.5"),
+    "re2": ("all", "20251105"),
 }
 
 

@@ -49,6 +49,22 @@ class Probe(ConanFile):
 ''')
             (recipe / "probe.c").write_text('int sdk_probe(void) { return 42; }\n')
             (recipe / "tool.c").write_text('int sdk_probe(void); int main(void) { return sdk_probe() != 42; }\n')
+            protobuf = base / "protobuf"
+            protobuf.mkdir()
+            (protobuf / "conanfile.py").write_text('''
+import os
+from conan import ConanFile
+from conan.tools.files import save
+class Protobuf(ConanFile):
+    name = "protobuf"
+    version = "0.0"
+    package_type = "application"
+    settings = "os", "arch", "compiler", "build_type"
+    def package(self):
+        executable = os.path.join(self.package_folder, "bin", "protoc")
+        save(self, executable, "#!/bin/sh\\nexit 0\\n")
+        os.chmod(executable, 0o755)
+''')
             consumer = base / "consumer"
             consumer.mkdir()
             (consumer / "conanfile.py").write_text(f'''
@@ -59,8 +75,10 @@ spec = importlib.util.spec_from_file_location("workrave_consumer", {str(ROOT / "
 shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
 class Consumer(ConanFile):
+    options = {{"with_grpc": [True, False]}}
+    default_options = {{"with_grpc": False}}
     settings = "os", "arch", "compiler", "build_type"
-    requires = "qt/0.0"
+    requires = "qt/0.0", "protobuf/0.0"
     def generate(self):
         shared.WorkraveDependencies.generate(self)
     def layout(self):
@@ -159,6 +177,7 @@ compiler.cppstd=20
 build_type=Release
 ''')
                 self.command("conan", "export-pkg", recipe, f"-pr:h={profile}", f"-pr:b={profile}", "-nr")
+                self.command("conan", "export-pkg", protobuf, f"-pr:h={profile}", f"-pr:b={profile}", "-nr")
                 build = base / arch
                 self.command("conan", "install", consumer, f"-pr:h={profile}", f"-pr:b={profile}",
                              f"-of={build}", "-nr", "--format=json", f"--out-file={build / 'graph.json'}")
